@@ -15,7 +15,7 @@ import axios from 'axios'
 import { Input } from '../ui/input'
 import { UserDetailContext } from '@/context/UserDetailContext'
 
-type Repo = {
+export type Repo = {
     id: string,
     name: string,
     full_name: string,
