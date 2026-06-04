@@ -17,7 +17,8 @@ export async function GET() {
         const res = await fetch(`https://api.github.com/user/repos?per_page=100&page=${page}&sort=updated`, {
             headers: {
                 Authorization: `Bearer ${token}`,
-                Accept: "application/vnd.github.v3+json"
+                Accept: "application/vnd.github.v3+json",
+                "User-Agent": "ai-test-automation-agent"
             }
         });
 
