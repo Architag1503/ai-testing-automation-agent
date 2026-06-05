@@ -12,6 +12,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@browserbasehq/sdk": "^2.12.0",
     "@clerk/nextjs": "^7.2.3",
     "@google/genai": "^2.8.0",
     "@neondatabase/serverless": "^1.0.2",
@@ -26,6 +27,7 @@
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^0.475.0",
     "next": "^16.2.6",
+    "playwright-core": "^1.60.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "stripe": "^22.1.1",
