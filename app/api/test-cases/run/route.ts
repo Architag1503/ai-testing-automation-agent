@@ -275,15 +275,38 @@ Just return the executable code.
             const context = browser.contexts()[0];
             const page = context.pages()[0];
 
+            // Inject current user session cookies (Clerk / GitHub) into Browserbase context
+            try {
+                const urlObj = new URL(baseUrl);
+                const domain = urlObj.hostname;
+                const reqCookies = req.cookies.getAll();
+                
+                if (reqCookies && reqCookies.length > 0) {
+                    const playwrightCookies = reqCookies.map(cookie => ({
+                        name: cookie.name,
+                        value: cookie.value,
+                        domain: domain,
+                        path: '/',
+                        secure: true,
+                        sameSite: 'Lax' as const
+                    }));
+                    await context.addCookies(playwrightCookies);
+                    logs.push(`[SYSTEM] Injected ${playwrightCookies.length} session cookies for domain ${domain} into browser context.`);
+                }
+            } catch (cookieErr: any) {
+                console.error("Failed to inject cookies:", cookieErr);
+                logs.push(`[SYSTEM WARNING] Failed to inject user session cookies: ${cookieErr.message}`);
+            }
+
             // 6. Listen to Browser Console Events
             page.on("console", (msg: any) => {
                 logs.push(`[BROWSER] [${msg.type().toUpperCase()}] ${msg.text()}`);
             });
 
-            // Inject localtunnel bypass headers so the interstitial warning page is skipped
-            // (localtunnel shows a human-facing "You are about to visit" page to cloud browsers
-            // unless the bypass-tunnel-reminder header is set on every request)
+            // Inject tunnel bypass headers so warning pages are skipped
             const isLocaltunnel = baseUrl.includes(".loca.lt");
+            const isNgrok = baseUrl.includes("ngrok-free.app") || baseUrl.includes("ngrok.io");
+            
             if (isLocaltunnel) {
                 await page.setExtraHTTPHeaders({
                     "bypass-tunnel-reminder": "1",
@@ -291,6 +314,12 @@ Just return the executable code.
                     "user-agent": "Mozilla/5.0 (compatible; Browserbase/1.0; +https://browserbase.com)",
                 });
                 logs.push(`[SYSTEM] Localtunnel detected — injected bypass-tunnel-reminder header to skip the interstitial warning page.`);
+            } else if (isNgrok) {
+                await page.setExtraHTTPHeaders({
+                    "ngrok-skip-browser-warning": "true",
+                    "user-agent": "Mozilla/5.0 (compatible; Browserbase/1.0; +https://browserbase.com)",
+                });
+                logs.push(`[SYSTEM] ngrok detected — injected ngrok-skip-browser-warning header.`);
             }
 
             logs.push(`[SYSTEM] Connected to Browserbase cloud browser, executing script...`);
@@ -338,11 +367,20 @@ Just return the executable code.
             console.error("Script execution error:", execError);
             const errMsg: string = execError.message || String(execError);
             logs.push(`[SYSTEM ERROR] Script execution failed: ${errMsg}`);
-
+ 
             // Provide actionable hints for common failure patterns
-            if (errMsg.includes("503") || errMsg.toLowerCase().includes("tunnel unavailable") || errMsg.toLowerCase().includes("err_connection_refused")) {
-                logs.push(`[SYSTEM HINT] ⚠️ Got a 503 / connection refused error. This usually means your tunnel (ngrok/localtunnel) has expired or is not running.`);
-                logs.push(`[SYSTEM HINT] ➡ Restart your tunnel: run  npx localtunnel --port 3000  (or  ngrok http 3000)  in a new terminal, then paste the new public URL into the Target Website URL field and try again.`);
+            const isTunnelError = errMsg.includes("503") || 
+                                 errMsg.includes("408") || 
+                                 errMsg.toLowerCase().includes("tunnel unavailable") || 
+                                 errMsg.toLowerCase().includes("err_connection_refused") || 
+                                 errMsg.toLowerCase().includes("timeout") ||
+                                 errMsg.toLowerCase().includes("err_http_response_code_failure");
+                                 
+            if (isTunnelError) {
+                logs.push(`[SYSTEM HINT] ⚠️ Tunnel connection failed (503 / 408 / connection refused / timeout).`);
+                logs.push(`[SYSTEM HINT] ➡ This usually means your tunnel (localtunnel or ngrok) crashed, expired, or is blocked.`);
+                logs.push(`[SYSTEM HINT] ➡ Action: Restart your tunnel in your terminal (run "npx localtunnel --port 3000" or "ngrok http 3000").`);
+                logs.push(`[SYSTEM HINT] ➡ Tip: Localtunnel is highly unstable and frequently drops connections. We recommend switching to ngrok for reliable local testing!`);
             }
             if (errMsg.toLowerCase().includes("dependency is missing") || errMsg.toLowerCase().includes("require is not defined") || errMsg.toLowerCase().includes("cannot find module")) {
                 logs.push(`[SYSTEM HINT] ⚠️ The AI-generated script tried to import/require a Node.js module, which is not allowed in the sandboxed runner.`);
