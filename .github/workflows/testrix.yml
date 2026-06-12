@@ -1,0 +1,93 @@
+name: Testrix CI
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      repoId:
+        description: "Testrix Repository ID (from workspace settings)"
+        required: true
+      branch:
+        description: "Branch to test"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+  checks: write
+
+jobs:
+  test:
+    name: Run Testrix Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine branch and commit SHA
+        id: info
+        run: |
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+
+      - name: Call Testrix API to run tests
+        id: testrix
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.TESTRIX_API_URL || 'https://app.testrix.ai' }}/api/github/actions/run" \
+            -H "Authorization: Bearer ${{ secrets.TESTRIX_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "repoId": ${{ secrets.TESTRIX_REPO_ID }},
+              "repoFullName": "${{ github.repository }}",
+              "branch": "${{ steps.info.outputs.branch }}",
+              "commitSha": "${{ steps.info.outputs.sha }}",
+              "prNumber": ${{ github.event.pull_request.number || 0 }},
+              "githubToken": "${{ secrets.GITHUB_TOKEN }}",
+              "runId": "${{ github.run_id }}"
+            }')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "response=$BODY" >> $GITHUB_OUTPUT
+          echo "status_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Error: API returned status $HTTP_CODE"
+            echo "Response: $BODY"
+            exit 1
+          fi
+
+      - name: Display Test Results
+        run: |
+          echo "## Testrix Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.testrix.outputs.response }}" | jq -r '
+            "| Test | Status |",
+            "|------|--------|",
+            (.results // [] | .[] | "| \(.title) | \(.status) |"),
+            "",
+            "**Summary:** \(.summary.passed)/\(.summary.total) passed (\(.summary.passRate))"
+          ' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View full run: https://app.testrix.ai/workspace" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check test results
+        if: always()
+        run: |
+          PASSED=$(echo '${{ steps.testrix.outputs.response }}' | jq -r '.summary.passed // 0')
+          TOTAL=$(echo '${{ steps.testrix.outputs.response }}' | jq -r '.summary.total // 0')
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "No tests were executed."
+            exit 0
+          fi
+          if [ "$PASSED" -lt "$TOTAL" ]; then
+            echo "Some tests failed: $PASSED/$TOTAL passed"
+            exit 1
+          fi
+          echo "All tests passed: $PASSED/$TOTAL"
