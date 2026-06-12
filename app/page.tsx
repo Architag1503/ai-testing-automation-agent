@@ -684,6 +684,9 @@ assert(listText.includes('e-commerce'), 'Repo failed to appear');`}</code>
                   <li className="flex items-center gap-2 text-slate-400 line-through">
                     Browserbase session video replays
                   </li>
+                  <li className="flex items-center gap-2 text-slate-400 line-through">
+                    CI/CD — GitHub Actions auto-run
+                  </li>
                 </ul>
               </CardContent>
 
@@ -741,6 +744,10 @@ assert(listText.includes('e-commerce'), 'Repo failed to appear');`}</code>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
                     Browserbase session video replays
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-emerald-600" />
+                    CI/CD — GitHub Actions auto-run
                   </li>
                 </ul>
               </CardContent>
@@ -802,6 +809,10 @@ assert(listText.includes('e-commerce'), 'Repo failed to appear');`}</code>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
                     Browserbase session video replays
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-emerald-600" />
+                    CI/CD — GitHub Actions auto-run
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
@@ -868,6 +879,10 @@ assert(listText.includes('e-commerce'), 'Repo failed to appear');`}</code>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
                     Prioritized AI generation queues
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-emerald-600" />
+                    CI/CD — GitHub Actions auto-run
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
