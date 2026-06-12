@@ -101,9 +101,11 @@ export default function Pricing() {
       priceAnnually: 0,
       period: "10 days",
       features: [
+        "1,000 starter credits",
         "1 Repository sync limit",
         "20 test cases generated",
         "20 test runs executed",
+        "No Voice Agent access",
         "No session video replays",
       ],
       isPopular: false,
@@ -121,16 +123,18 @@ export default function Pricing() {
       period: "month",
       billingText: "Billed every 3 months",
       features: [
+        "35,000 credits / 3 months",
         "5 Repositories limit",
         "500 test cases / month",
         "500 test runs / month",
+        "Voice Agent Support (10 conversations)",
         "Browserbase session video replays",
       ],
       isPopular: false,
       isTrial: false,
       priceIdMonthly: "price_1Pro3Month_monthly",
       priceIdAnnually: "price_1Pro3Month_annually",
-      creditsToGrant: 2500
+      creditsToGrant: 35000
     },
     {
       name: "Business 6-Month",
@@ -141,9 +145,11 @@ export default function Pricing() {
       period: "month",
       billingText: "Billed every 6 months",
       features: [
+        "120,000 credits / 6 months",
         "15 Repositories limit",
         "2,000 test cases / month",
         "2,000 test runs / month",
+        "Voice Agent Support (30 conversations)",
         "Browserbase session video replays",
         "Prioritized AI generation queues",
       ],
@@ -151,7 +157,7 @@ export default function Pricing() {
       isTrial: false,
       priceIdMonthly: "price_1Biz6Month_monthly",
       priceIdAnnually: "price_1Biz6Month_annually",
-      creditsToGrant: 10000
+      creditsToGrant: 120000
     },
     {
       name: "Enterprise 1-Year",
@@ -162,9 +168,11 @@ export default function Pricing() {
       period: "month",
       billingText: "Billed annually",
       features: [
+        "600,000 credits / year",
         "Unlimited repositories sync",
         "10,000 test cases / month",
         "10,000 test runs / month",
+        "Unlimited Voice Agent Support",
         "Browserbase session video replays",
         "Prioritized AI queues",
         "Dedicated premium support",
@@ -173,7 +181,7 @@ export default function Pricing() {
       isTrial: false,
       priceIdMonthly: "price_1Ent1Year_monthly",
       priceIdAnnually: "price_1Ent1Year_annually",
-      creditsToGrant: 50000
+      creditsToGrant: 600000
     }
   ]
 
@@ -412,7 +420,11 @@ export default function Pricing() {
                 What are credits used for?
               </AccordionTrigger>
               <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">
-                Credits are consumed when Testrix generates or executes automated Playwright test scripts. A typical generation costs 20 credits, while a cloud execution run takes 10 credits.
+                Credits power every key action on Testrix:
+                • Uploading a repository: 500 credits
+                • Running a single test case: 50 credits
+                • One Voice Agent conversation: 300 credits
+                Upgrading your plan instantly tops up your credit balance via Stripe.
               </AccordionContent>
             </AccordionItem>
 
@@ -430,11 +442,20 @@ export default function Pricing() {
                 How does the simulation checkout work?
               </AccordionTrigger>
               <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">
-                If Stripe keys are not configured in your project settings/environment, our platform triggers a fallback Developer Simulation. It mocks the transaction locally and safely grants the plan's credits (e.g. +2,500 credits for Pro) straight to your active workspace so you can test features seamlessly.
+                If Stripe keys are not configured in your project settings/environment, our platform triggers a fallback Developer Simulation. It mocks the transaction locally and safely grants the plan's credits (e.g. +35,000 credits for Pro) straight to your active workspace so you can test features seamlessly.
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-4" className="border-b-0">
+            <AccordionItem value="item-4" className="border-b border-slate-100">
+              <AccordionTrigger className="text-slate-800 font-semibold hover:text-emerald-600 text-sm py-4">
+                What is the Voice Agent support?
+              </AccordionTrigger>
+              <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">
+                Our AI Voice Agent lives in the Support section and helps you debug test failures, configure repositories, and navigate the platform through natural voice conversation. Each one-time conversation costs 300 credits. Pro plans include 10 conversations, Business includes 30, and Enterprise offers unlimited access.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-5" className="border-b-0">
               <AccordionTrigger className="text-slate-800 font-semibold hover:text-emerald-600 text-sm py-4">
                 What is Browserbase session playback?
               </AccordionTrigger>

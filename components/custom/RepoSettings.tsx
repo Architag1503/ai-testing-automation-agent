@@ -26,14 +26,19 @@ function RepoSettings({ repo, setReload }: props) {
     const [repoSettings, setRepoSettings] = useState({
         targetDomain: repo?.targetDomain || '',
         globalInstruction: repo?.globalInstruction || '',
+        testEmail: repo?.testEmail || '',
+        testPassword: repo?.testPassword || '',
+        clerkSecretKey: repo?.clerkSecretKey || '',
     })
 
     const handleSaveSettings = async () => {
-
         const result = await axios.post('/api/user-repo/settings', {
             repoId: repo.repoId,
             targetDomain: repoSettings.targetDomain,
             globalInstruction: repoSettings.globalInstruction,
+            testEmail: repoSettings.testEmail,
+            testPassword: repoSettings.testPassword,
+            clerkSecretKey: repoSettings.clerkSecretKey,
         })
 
         console.log(result?.data);
@@ -67,6 +72,38 @@ function RepoSettings({ repo, setReload }: props) {
                             onChange={(e) => setRepoSettings({ ...repoSettings, globalInstruction: e.target.value })}
                             placeholder='Instructions' className='mt-1' />
                         <p className='text-xs text-gray-400 mt-1'>Include any authentication credentials, cookies, setup or teardown instructions. These are automatically appended to Gemini's Prompt</p>
+                    </div>
+                    <div className='mt-4 pt-4 border-t'>
+                        <h4 className='text-sm font-medium text-gray-700 mb-2'>Test Credentials (for auto sign-in)</h4>
+                        <div className='grid grid-cols-2 gap-3'>
+                            <div>
+                                <label className='text-gray-500'>EMAIL</label>
+                                <Input value={repoSettings?.testEmail}
+                                    onChange={(e) => setRepoSettings({ ...repoSettings, testEmail: e.target.value })}
+                                    placeholder='test@example.com' className='mt-1' type='email' />
+                            </div>
+                            <div>
+                                <label className='text-gray-500'>PASSWORD</label>
+                                <Input value={repoSettings?.testPassword}
+                                    onChange={(e) => setRepoSettings({ ...repoSettings, testPassword: e.target.value })}
+                                    placeholder='Password' className='mt-1' type='password' />
+                            </div>
+                        </div>
+                        <p className='text-xs text-gray-400 mt-2'>If provided, the test script will automatically sign in before testing protected routes.</p>
+                    </div>
+                    <div className='mt-4 pt-4 border-t'>
+                        <h4 className='text-sm font-medium text-gray-700 mb-2'>Clerk Secret Key (optional)</h4>
+                        <div>
+                            <label className='text-gray-500'>CLERK SECRET KEY</label>
+                            <Input value={repoSettings?.clerkSecretKey}
+                                onChange={(e) => setRepoSettings({ ...repoSettings, clerkSecretKey: e.target.value })}
+                                placeholder='sk_test_... or sk_live_...' className='mt-1' type='password' />
+                            <p className='text-xs text-gray-400 mt-2'>
+                                If provided, the test runner will attempt server-side session injection (fast-path auth). 
+                                Otherwise, email/password sign-in through the UI form is used. Get this from 
+                                <code className='bg-gray-100 px-1 rounded mx-1 text-[11px]'> Clerk Dashboard → API Keys</code>
+                            </p>
+                        </div>
                     </div>
                 </div>
                 <DialogFooter>
