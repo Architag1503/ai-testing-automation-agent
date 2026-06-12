@@ -22,6 +22,9 @@ export const repositories = pgTable("repositories", {
   defaultBranch: text("default_branch"),
   targetDomain: varchar("target_domain").default("http://localhost:3000"),
   globalInstruction: text("global_instruction"),
+  testEmail: varchar("test_email"),
+  testPassword: varchar("test_password"),
+  clerkSecretKey: varchar("clerk_secret_key"),
 });
 
 export const TestCasesTable = pgTable("test_cases", {
@@ -56,6 +59,25 @@ export const TestCasesTable = pgTable("test_cases", {
   sessionUrl: varchar("session_url", { length: 500 })
 });
 
+
+export const chatsTable = pgTable("chats", {
+    id: serial("id").primaryKey(),
+    userId: varchar("user_id", { length: 255 }).notNull(),
+    repoId: varchar("repo_id", { length: 255 }),
+    repoName: varchar("repo_name", { length: 255 }),
+    repoOwner: varchar("repo_owner", { length: 255 }),
+    title: text("title").default("New Chat"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const chatMessagesTable = pgTable("chat_messages", {
+    id: serial("id").primaryKey(),
+    chatId: integer("chat_id").references(() => chatsTable.id, { onDelete: "cascade" }).notNull(),
+    role: varchar("role", { length: 50 }).notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+});
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
