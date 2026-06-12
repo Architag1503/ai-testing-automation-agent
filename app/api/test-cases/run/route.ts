@@ -431,63 +431,56 @@ if (needsSignIn) {
     } catch (e) { console.log('[AUTH] Approach 2c error:', e.message); }
   }
 
-  // ==== APPROACH 2d: Extract publishable key → call Frontend API from server for client JWT ====
+  // ==== APPROACH 2d: Use Frontend API from INSIDE browser to get client JWT ====
   if (!signInSucceeded && clerkSessionId) {
-    console.log('[AUTH] Approach 2d: Trying Frontend API sign-in with admin strategy...');
+    console.log('[AUTH] Approach 2d: Trying Frontend API admin strategy from browser context...');
     try {
-      let pubKey = await page.evaluate(() => {
-        const script = document.querySelector('script[data-clerk-publishable-key]');
-        if (script?.getAttribute('data-clerk-publishable-key')) return script.getAttribute('data-clerk-publishable-key');
-        const meta = document.querySelector('meta[name="clerk-publishable-key"]');
-        return meta?.getAttribute('content') || '';
-      }).catch(() => '');
-      if (!pubKey) {
-        // Try extracting from the Next.js inline data
-        const fallback = await page.evaluate(() => {
-          const scripts = document.querySelectorAll('script');
-          for (const s of scripts) {
-            const m = s.textContent?.match(/["']publishableKey["']\s*:\s*["']([^"']+)["']/);
-            if (m) return m[1];
-            const m2 = s.textContent?.match(/["']__clerk_publishable_key["']\s*,\s*["']([^"']+)["']/);
-            if (m2) return m2[1];
+      const clientData = await page.evaluate(async ({ sessionId, targetUrl }) => {
+        const pubKey = (() => {
+          const s = document.querySelector('script[data-clerk-publishable-key]');
+          if (s?.getAttribute('data-clerk-publishable-key')) return s.getAttribute('data-clerk-publishable-key');
+          const m = document.querySelector('meta[name="clerk-publishable-key"]');
+          if (m?.getAttribute('content')) return m.getAttribute('content');
+          for (const sc of document.querySelectorAll('script')) {
+            const t = sc.textContent || '';
+            const r = t.match(/["']publishableKey["']\s*:\s*["']([^"']+)["']/);
+            if (r) return r[1];
           }
-          return '';
-        }).catch(() => '');
-        if (fallback) { pubKey = fallback; }
-      }
-      if (pubKey) {
-        const frontendRes = await fetch('https://api.clerk.com/v1/client/sign_ins?__clerk_publishable_key=' + encodeURIComponent(pubKey), {
+          return null;
+        })();
+        if (!pubKey) return { error: 'no pub key' };
+        const res = await fetch('https://api.clerk.com/v1/client/sign_ins?__clerk_publishable_key=' + encodeURIComponent(pubKey), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ strategy: 'admin', session_id: clerkSessionId })
+          body: JSON.stringify({ strategy: 'admin', session_id: sessionId })
         });
-        const frontendData = await frontendRes.json();
-        if (frontendRes.ok && frontendData.client?.jwt) {
-          const clientJwt = frontendData.client.jwt;
-          console.log('[AUTH] Got client JWT from Frontend API');
-          const hostname = new URL(page.url()).hostname;
-          await page.context().addCookies([
-            { name: '__session', value: clientJwt, domain: hostname, path: '/' },
-            { name: '__client_uat', value: String(Math.floor(Date.now() / 1000)), domain: hostname, path: '/' }
-          ]);
-          await page.goto('${escapedBaseUrl}${escapedTargetRoute}', { waitUntil: 'load', timeout: 20000 });
-          await page.waitForLoadState('networkidle').catch(() => {});
-          await page.waitForTimeout(3000);
-          pageBodyText = await getPageText();
-          console.log('[AUTH] After client JWT injection (Frontend API), URL:', page.url());
-          if (!(await isOnSignInPage())) {
-            const expectedText = '${escapedExpected}';
-            const hasExpectedText = expectedText ? pageBodyText.toLowerCase().includes(expectedText.toLowerCase()) : true;
-            if (hasExpectedText) {
-              console.log('[AUTH] Client JWT injection worked!');
-              signInSucceeded = true;
-            } else {
-              console.log('[AUTH] Client JWT injection not showing expected text');
-            }
-          }
-        } else {
-          console.log('[AUTH] Frontend API admin strategy failed:', frontendData.error || JSON.stringify(frontendData).slice(0, 300) || 'no client JWT');
+        const data = await res.json();
+        if (res.ok && data.client?.jwt) {
+          // Set the client JWT as the session cookie
+          document.cookie = '__session=' + data.client.jwt + '; path=/;';
+          document.cookie = '__client_uat=' + Math.floor(Date.now() / 1000) + '; path=/;';
+          return { success: true, clientJwt: data.client.jwt };
         }
+        return { error: data.error || data.status || JSON.stringify(data).slice(0, 200) };
+      }, { sessionId: clerkSessionId, targetUrl: '${escapedTargetRoute}' });
+      if (clientData?.success) {
+        console.log('[AUTH] Got client JWT from in-browser Frontend API');
+        await page.goto('${escapedBaseUrl}${escapedTargetRoute}', { waitUntil: 'load', timeout: 20000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await page.waitForTimeout(3000);
+        pageBodyText = await getPageText();
+        if (!(await isOnSignInPage())) {
+          const expectedText = '${escapedExpected}';
+          const hasExpectedText = expectedText ? pageBodyText.toLowerCase().includes(expectedText.toLowerCase()) : true;
+          if (hasExpectedText) {
+            console.log('[AUTH] In-browser admin strategy worked!');
+            signInSucceeded = true;
+          } else {
+            console.log('[AUTH] In-browser admin strategy got client JWT but expected text not found');
+          }
+        }
+      } else {
+        console.log('[AUTH] In-browser admin strategy failed:', clientData?.error || 'no data');
       }
     } catch (e) { console.log('[AUTH] Approach 2d error:', e.message); }
   }
@@ -670,24 +663,64 @@ if (needsSignIn) {
       console.log('[AUTH] Fallback URL:', page.url());
       // If redirect to sign-in, try SDK sign-in
       if (page.url().includes('/sign-in') || (await isOnSignInPage())) {
-        console.log('[AUTH] Fallback redirected to sign-in — trying SDK sign-in...');
+        console.log('[AUTH] Fallback redirected to sign-in — trying in-browser admin strategy...');
         try {
-          const sdkResult = await page.evaluate(async ({ email, password }) => {
-            if (!window.Clerk) return { success: false, error: 'No Clerk' };
-            await window.Clerk.load();
-            const signIn = await window.Clerk.client.signIn.create({
-              strategy: 'password', identifier: email, password
+          const adminResult = await page.evaluate(async ({ sessionId }) => {
+            const pubKey = (() => {
+              const s = document.querySelector('script[data-clerk-publishable-key]');
+              if (s?.getAttribute('data-clerk-publishable-key')) return s.getAttribute('data-clerk-publishable-key');
+              for (const sc of document.querySelectorAll('script')) {
+                const t = sc.textContent || '';
+                const r = t.match(/["']publishableKey["']\s*:\s*["']([^"']+)["']/);
+                if (r) return r[1];
+              }
+              return null;
+            })();
+            if (!pubKey) return { error: 'no pub key' };
+            const res = await fetch('https://api.clerk.com/v1/client/sign_ins?__clerk_publishable_key=' + encodeURIComponent(pubKey), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ strategy: 'admin', session_id: sessionId })
             });
-            if (signIn.status === 'complete' || signIn.createdSessionId) return { success: true };
-            return { success: false, error: 'SDK status: ' + signIn.status };
-          }, { email: autoEmail, password: autoPassword });
-          if (sdkResult.success) {
+            const data = await res.json();
+            if (res.ok && data.client?.jwt) {
+              document.cookie = '__session=' + data.client.jwt + '; path=/;';
+              document.cookie = '__client_uat=' + Math.floor(Date.now() / 1000) + '; path=/;';
+              return { success: true };
+            }
+            return { error: data.error || data.status || 'no client JWT' };
+          }, { sessionId: clerkSessionId });
+          if (adminResult?.success) {
+            console.log('[AUTH] In-browser admin strategy succeeded in fallback!');
             await page.goto('${escapedBaseUrl}/workspace', { waitUntil: 'load', timeout: 20000 });
             await page.waitForLoadState('networkidle').catch(() => {});
             await page.waitForTimeout(3000);
             pageBodyText = await getPageText();
+            if (!(await isOnSignInPage()) && pageBodyText.toLowerCase().includes(expectedResultText.toLowerCase())) {
+              signInSucceeded = true;
+            }
+          } else {
+            console.log('[AUTH] Fallback admin strategy failed:', adminResult?.error);
+            // Try SDK sign-in one more time
+            try {
+              const sdkResult = await page.evaluate(async ({ email, password }) => {
+                if (!window.Clerk) return { success: false, error: 'No Clerk' };
+                await window.Clerk.load();
+                const si = await window.Clerk.client.signIn.create({
+                  strategy: 'password', identifier: email, password
+                });
+                if (si.status === 'complete' || si.createdSessionId) return { success: true };
+                return { success: false, error: 'SDK status: ' + si.status };
+              }, { email: autoEmail, password: autoPassword });
+              if (sdkResult.success) {
+                await page.goto('${escapedBaseUrl}/workspace', { waitUntil: 'load', timeout: 20000 });
+                await page.waitForLoadState('networkidle').catch(() => {});
+                await page.waitForTimeout(3000);
+                pageBodyText = await getPageText();
+              }
+            } catch (e) {}
           }
-        } catch (e) {}
+        } catch (e) { console.log('[AUTH] Fallback retry error:', e.message); }
       }
     }
   }
