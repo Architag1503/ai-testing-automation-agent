@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { TestCasesTable, repositories } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { TestCasesTable, repositories, users } from "@/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { Browserbase } from "@browserbasehq/sdk";
 import { chromium } from "playwright-core";
 
@@ -120,6 +120,35 @@ export async function POST(req: NextRequest) {
             });
             return NextResponse.json({ summary: { total: 0, passed: 0, failed: 0, passRate: "0%" }, results: [] });
         }
+
+        // Check credits before running
+        const userRecord = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, repoRecord.userId))
+            .limit(1);
+
+        const costPerTest = 10;
+        const totalCost = testCases.length * costPerTest;
+        const userCredits = userRecord[0]?.credits ?? 0;
+
+        if (userCredits < totalCost) {
+            await postGitHubStatus({
+                token: githubToken, owner, repo: repoName, sha: commitSha,
+                state: "error", description: `Insufficient credits: need ${totalCost}, have ${userCredits}`,
+                context: "testrix/ci",
+            });
+            return NextResponse.json({
+                error: `Insufficient credits. Required: ${totalCost}, Available: ${userCredits}. Purchase more at app.testrix.ai/workspace/pricing`,
+                summary: { total: 0, passed: 0, failed: 0, passRate: "0%" },
+                results: [],
+            }, { status: 402 });
+        }
+
+        // Deduct credits upfront
+        await db.update(users)
+            .set({ credits: sql`${users.credits} - ${totalCost}` })
+            .where(eq(users.id, repoRecord.userId));
 
         const baseUrl = repoRecord.targetDomain || `https://${repoFullName}`;
 
