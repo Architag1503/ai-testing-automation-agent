@@ -157,28 +157,25 @@ function UserRepoList({ repoList, setReload }: props) {
                                     />
                                 </div>
 
-                                {!testCaseLoading && testCases?.length > 0 && <TestCaseList testCases={testCases} onReload={(repoId: number) => GetTestCases(repoId)} repository={repo} userId={userDetail?.id} />}
+                                {!testCaseLoading && testCases?.length > 0 && <TestCaseList testCases={testCases} onReload={(repoId: number) => GetTestCases(repoId)} repository={repo} />}
 
                                 {testCaseLoading ?
                                     <h2 className='flex gap-3 items-center'><Loader2Icon className='animate-spin' /> Please Wait....</h2>
                                     :
-                                    <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 border rounded-xl p-4 bg-gray-50'>
+                                    testCases?.length == 0 && <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 border rounded-xl p-4 bg-gray-50'>
                                         <div>
                                             <h3 className='font-medium'>
                                                 {loading ? "Generating Test Cases ....."
-                                                    : testCases?.length > 0 ? "Regenerate AI Test Cases"
-                                                        : "Generate AI Test Cases"}
+                                                    : "Generate AI Test Cases"}
                                             </h3>
                                             <p className='text-sm text-gray-500 mt-1'>
-                                                {testCases?.length > 0
-                                                    ? "Delete existing cases and regenerate new test cases from your source code."
-                                                    : "Analyze this repository and generate automated test cases using AI."}
+                                                Analyze this repository and generate automated test cases using AI.
                                             </p>
                                         </div>
 
                                         <Button className='gap-2' disabled={loading} onClick={() => handleGenerateTestCases(repo)}>
                                             {loading ? <Loader2 className='animate-spin' /> : <Sparkles className='h-4 w-4' />}
-                                            {testCases?.length > 0 ? 'Regenerate Test Cases' : 'Generate Test Cases'}
+                                            Generate Test Cases
                                         </Button>
                                     </div>
                                 }

@@ -13,10 +13,8 @@ import {
   HelpCircle, 
   Sparkles, 
   ArrowRight,
-  Bot,
-  Mic
+  Bot
 } from "lucide-react"
-import axios from "axios"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -103,7 +101,7 @@ export default function Support() {
     {
       id: "welcome",
       sender: "bot",
-      text: "Hi there! I'm Testy, your AI QA assistant. Ask me anything about Testrix — debugging failed tests, fixing tunnel errors, configuring repos, or understanding credits!",
+      text: "Hi there! 👋 I'm Testy, your AI QA assistant. Ask me anything about Testrix, or select a topic below!",
       timestamp: new Date()
     }
   ])
@@ -134,40 +132,49 @@ export default function Support() {
     }, 2000)
   }
 
-  const triggerBotResponse = async (userText: string) => {
+  // Predefined chatbot questions & answers
+  const quickQuestions = [
+    {
+      q: "How to add a repository?",
+      a: "To add a repository:\n1. Click the 'Workspace' tab in the navigation header.\n2. Click the '+ Add Repo' button (or Setup if Github isn't connected).\n3. Grant Github authorization.\n4. Select your target repo, specify the testing branch, and input your target local or staging URL.\n5. Click Save!"
+    },
+    {
+      q: "Why are my tests failing?",
+      a: "Common test execution failures:\n1. Target URL unreachable: For local dev servers, make sure localtunnel or ngrok is running.\n2. Page selectors changed: If a button ID changed, update your test case global instructions to use the new text.\n3. Session timeouts: Increase test timeout limits in instructions if page load exceeds 15 seconds."
+    },
+    {
+      q: "What are credits used for?",
+      a: "Credits power the AI agent runs:\n- Generating a new Playwright test case: 20 credits.\n- Running a cloud test execution: 10 credits.\nIf you run out of credits, navigate to the 'Pricing' tab to simulate a workspace upgrade and instantly add credits."
+    }
+  ]
+
+  const triggerBotResponse = (userText: string) => {
     setIsBotTyping(true)
 
-    try {
-      const res = await axios.post("/api/chatbot", {
-        message: userText,
-        history: chatMessages.map(m => ({ sender: m.sender, text: m.text })),
-      })
-
-      const answer = res.data.answer
+    // Calculate response
+    setTimeout(() => {
+      let botResponse = "That is a great question! For detailed assistance with that specific issue, please submit a ticket using the Support Form on the left. Our engineering team will review it and reply within 2 hours."
+      
+      const matched = quickQuestions.find(item => userText.toLowerCase().includes(item.q.toLowerCase()) || item.q.toLowerCase().includes(userText.toLowerCase()))
+      if (matched) {
+        botResponse = matched.a
+      } else if (userText.toLowerCase().includes("hello") || userText.toLowerCase().includes("hi")) {
+        botResponse = "Hello! Let me know if you have any questions about syncing repositories, writing custom test instructions, or checking out pricing plans."
+      } else if (userText.toLowerCase().includes("pricing") || userText.toLowerCase().includes("cost")) {
+        botResponse = "We offer a Free Trial, Pro, Business, and Enterprise plan. You can view all pricing details and activate plan upgrades in the Pricing tab above!"
+      }
 
       setChatMessages(prev => [
         ...prev,
         {
           id: `bot-${Date.now()}`,
           sender: "bot",
-          text: answer,
+          text: botResponse,
           timestamp: new Date()
         }
       ])
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.error || err.message || "Failed to get response"
-      setChatMessages(prev => [
-        ...prev,
-        {
-          id: `bot-${Date.now()}`,
-          sender: "bot",
-          text: `I'm sorry, I encountered an error: ${errorMsg}. Please try rephrasing your question.`,
-          timestamp: new Date()
-        }
-      ])
-    } finally {
       setIsBotTyping(false)
-    }
+    }, 1000)
   }
 
   const handleSendChatMessage = (text: string) => {
@@ -229,7 +236,7 @@ export default function Support() {
         {/* Quick Contact Cards */}
         <motion.div 
           variants={itemVariants} 
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-4"
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4"
         >
           {/* Email Support Card */}
           <SupportCard3D className="bg-white rounded-2xl border border-slate-200/80 hover:border-emerald-300 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/5">
@@ -297,28 +304,6 @@ export default function Support() {
             <CardFooter className="pt-0 pb-4">
               <span className="text-[10px] text-slate-400 font-semibold bg-slate-50 px-2 py-1 rounded-md">
                 15-Min Meeting
-              </span>
-            </CardFooter>
-          </SupportCard3D>
-
-          {/* Voice Agent Card */}
-          <SupportCard3D className="bg-white rounded-2xl border border-slate-200/80 hover:border-emerald-300 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/5">
-            <CardHeader className="text-left pb-3">
-              <div className="h-10 w-10 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-2">
-                <Mic className="h-5 w-5" />
-              </div>
-              <CardTitle className="text-base font-bold text-slate-900">AI Voice Agent</CardTitle>
-              <CardDescription className="text-xs text-slate-400">Hands-free support & debugging</CardDescription>
-            </CardHeader>
-            <CardContent className="text-left flex-1 pb-4">
-              <p className="text-slate-600 text-xs leading-relaxed">
-                Talk to our AI Voice Agent for instant help with test failures, repository setup, and platform navigation.
-              </p>
-              <p className="text-emerald-600 font-bold text-sm mt-4">300 credits / conversation</p>
-            </CardContent>
-            <CardFooter className="pt-0 pb-4">
-              <span className="text-[10px] text-slate-400 font-semibold bg-slate-50 px-2 py-1 rounded-md">
-                Included in paid plans
               </span>
             </CardFooter>
           </SupportCard3D>
@@ -491,8 +476,8 @@ export default function Support() {
                     </p>
                   </div>
                 </div>
-                <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-200/50 hover:bg-emerald-100 text-[10px]">
-                  AI Powered
+                <Badge className="bg-slate-100 text-slate-500 border border-slate-200/50 hover:bg-slate-100 text-[10px]">
+                  FAQ Bot
                 </Badge>
               </div>
 
@@ -537,18 +522,13 @@ export default function Support() {
                 <div className="pb-3 border-t border-slate-50 pt-2 text-left space-y-1.5">
                   <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold px-1">Quick Topics:</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {[
-                      "How to add a repository?",
-                      "Why are my tests failing?",
-                      "How to resolve tunnel errors?",
-                      "What are credits used for?"
-                    ].map((q) => (
+                    {quickQuestions.map((qObj) => (
                       <button 
-                        key={q}
-                        onClick={() => handleSendChatMessage(q)}
+                        key={qObj.q}
+                        onClick={() => handleSendChatMessage(qObj.q)}
                         className="text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium px-2.5 py-1 rounded-full border border-emerald-100/50 transition-colors cursor-pointer"
                       >
-                        {q}
+                        {qObj.q}
                       </button>
                     ))}
                   </div>
@@ -599,15 +579,6 @@ export default function Support() {
 
             <AccordionItem value="support-2" className="border-b border-slate-100">
               <AccordionTrigger className="text-slate-800 font-semibold hover:text-emerald-600 text-sm py-4">
-                How do credits work for repositories, tests, and the Voice Agent?
-              </AccordionTrigger>
-              <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">
-                Credits are consumed for core platform actions: uploading a repository costs 500 credits, running a single test case costs 50 credits, and each one-time conversation with our AI Voice Agent costs 300 credits. Free Trial users start with 1,000 credits. Paid plans include significantly larger credit pools (35,000–600,000) and Voice Agent conversation allowances.
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="support-3" className="border-b border-slate-100">
-              <AccordionTrigger className="text-slate-800 font-semibold hover:text-emerald-600 text-sm py-4">
                 Can I sync custom local repos that aren't on GitHub?
               </AccordionTrigger>
               <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">
@@ -615,7 +586,7 @@ export default function Support() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="support-4" className="border-b border-slate-100">
+            <AccordionItem value="support-3" className="border-b border-slate-100">
               <AccordionTrigger className="text-slate-800 font-semibold hover:text-emerald-600 text-sm py-4">
                 How do I configure bypass controls for complex auth walls?
               </AccordionTrigger>
@@ -624,7 +595,7 @@ export default function Support() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="support-5" className="border-b-0">
+            <AccordionItem value="support-4" className="border-b-0">
               <AccordionTrigger className="text-slate-800 font-semibold hover:text-emerald-600 text-sm py-4">
                 Do you provide enterprise SLAs?
               </AccordionTrigger>

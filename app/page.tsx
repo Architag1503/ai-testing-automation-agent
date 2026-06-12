@@ -671,10 +671,6 @@ assert(listText.includes('e-commerce'), 'Repo failed to appear');`}</code>
                 <ul className="space-y-3.5 text-xs text-slate-600 font-medium">
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
-                    1,000 starter credits
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-emerald-600" />
                     1 Repository sync limit
                   </li>
                   <li className="flex items-center gap-2">
@@ -684,9 +680,6 @@ assert(listText.includes('e-commerce'), 'Repo failed to appear');`}</code>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
                     20 test runs executed
-                  </li>
-                  <li className="flex items-center gap-2 text-slate-400 line-through">
-                    Voice Agent access
                   </li>
                   <li className="flex items-center gap-2 text-slate-400 line-through">
                     Browserbase session video replays
@@ -735,10 +728,6 @@ assert(listText.includes('e-commerce'), 'Repo failed to appear');`}</code>
                 <ul className="space-y-3.5 text-xs text-slate-600 font-medium">
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
-                    35,000 credits / 3 months
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-emerald-600" />
                     5 Repositories limit
                   </li>
                   <li className="flex items-center gap-2">
@@ -748,10 +737,6 @@ assert(listText.includes('e-commerce'), 'Repo failed to appear');`}</code>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
                     500 test runs / month
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-emerald-600" />
-                    Voice Agent (10 conversations)
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
@@ -804,10 +789,6 @@ assert(listText.includes('e-commerce'), 'Repo failed to appear');`}</code>
                 <ul className="space-y-3.5 text-xs text-slate-600 font-medium">
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
-                    120,000 credits / 6 months
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-emerald-600" />
                     15 Repositories limit
                   </li>
                   <li className="flex items-center gap-2">
@@ -817,10 +798,6 @@ assert(listText.includes('e-commerce'), 'Repo failed to appear');`}</code>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
                     2,000 test runs / month
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-emerald-600" />
-                    Voice Agent (30 conversations)
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
@@ -874,10 +851,6 @@ assert(listText.includes('e-commerce'), 'Repo failed to appear');`}</code>
                 <ul className="space-y-3.5 text-xs text-slate-600 font-medium">
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
-                    600,000 credits / year
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-emerald-600" />
                     <strong>Unlimited</strong> repositories sync
                   </li>
                   <li className="flex items-center gap-2">
@@ -887,10 +860,6 @@ assert(listText.includes('e-commerce'), 'Repo failed to appear');`}</code>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />
                     10,000 test runs / month
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-emerald-600" />
-                    Unlimited Voice Agent Support
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-600" />

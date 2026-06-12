@@ -219,12 +219,7 @@ You are an expert QA automation engineer.
 Analyze the GitHub repository source code and generate useful small test cases.
 
 Your goal:
-Generate test cases that verify content on a web page. Each test case works by navigating to a route and checking if specific text appears on the page.
-
-IMPORTANT CONTEXT: The test browser will have an authenticated user session (existing cookies are injected). This means:
-- Auth pages like /sign-in, /sign-up, /login, /register will REDIRECT to the home page
-- Clerk's <SignIn/> and <SignUp/> components CANNOT render because the user is already signed in
-- DO NOT generate test cases for sign-in, sign-up, login, or register routes — they will always fail
+Generate test cases that can later be converted into Playwright / Browserbase automation scripts.
 
 Repository:
 Owner: ${owner}
@@ -234,30 +229,22 @@ Branch: ${branch}
 Repository File Context:
 ${repoContext}
 
-Generate 5 to 10 test cases targeting only routes that work for authenticated users (e.g. /, /workspace, /dashboard, /settings, /pricing, etc.)
+Generate 5 to 10 test cases.
 
 Each test case must include:
-- title: clear test case title (e.g. "Verify workspace page loads")
+- title: clear test case title
 - description: one-line description
 - type: one of ui, auth, api, form, integration, edge-case
 - priority: low, medium, high
-- targetRoute: the app route to navigate to (e.g. /workspace, /, /pricing). CRITICAL: Must be ONLY the path portion — do NOT include the full URL (no http:// or https://). Example: "/workspace" is correct, "https://example.com/workspace" is WRONG.
-- targetFiles: related file paths from the repository context (max 3)
-- expectedResult: a SHORT phrase (3-10 words) that ACTUALLY appears as text on the rendered page. CRITICAL: This must be a hardcoded string literal visible in the source code of that route's page file or its direct child components.
+- targetRoute: most likely app route/page to test, for example /sign-in, /dashboard, /api/users
+- targetFiles: related file paths from the repository context
+- expectedResult: what should happen when the test passes
 
-CRITICAL rules for expectedResult:
-- Search the source code files of the targetRoute page for JSX string literals (headings, button text, labels, menu items)
-- Copy the EXACT text from the source code — every character must match (case-insensitive comparison is used at runtime, but the words must be the same)
-- Examples of GOOD expectedResult: "Workspace", "Remaining Credits", "Repositories", "Connect Github & Add Repository", "Automate Your Web Testing", "Go to Workspace", "Pricing", "Features"
-- Examples of BAD expectedResult: "Sign in to Testrix" (this text comes from Clerk SDK, not app source code and only shows for unauthenticated users), "Create your account" (same), "Connect Github accounts and add a repository" (actual page text is "Connect Github & Add Repository" — wrong words), "The user should be redirected", "API returns file path" — DO NOT use these
-- BAD examples are either auth-page-only text, descriptions of behavior, or paraphrased text. DO NOT use them.
-- Keep it short (3-10 words max)
-
-Other important rules:
+Important rules:
 - Only use file paths that exist in the repository context.
-- Do not invent fake target files or fake routes.
-- If route is unclear, infer from Next.js app/page structure (app/ directory).
-- Keep description short, one line only.
+- Do not invent fake target files.
+- If route is unclear, infer from Next.js app/page structure.
+- Keep description short, only one line.
 - Return only valid JSON.
 `;
 
@@ -371,24 +358,10 @@ Other important rules:
     } catch (error: any) {
         console.error("Generate test cases error:", error);
 
-        let userMessage = error.message || "Failed to generate test cases";
-        const errStr = (error.message || "").toLowerCase();
-        const causeStr = (error.cause?.message || "").toLowerCase();
-
-        if (errStr.includes("fetch failed") || causeStr.includes("connect timeout") || causeStr.includes("enotfound") || causeStr.includes("econnrefused")) {
-            userMessage = "Cannot connect to GitHub API. Check your internet connection and GitHub token, then try again.";
-        } else if (errStr.includes("401") || errStr.includes("unauthorized")) {
-            userMessage = "GitHub token is invalid or expired. Reconnect your GitHub account.";
-        } else if (errStr.includes("403") || errStr.includes("rate limit")) {
-            userMessage = "GitHub API rate limit exceeded. Wait a few minutes and try again.";
-        } else if (errStr.includes("404") || errStr.includes("not found")) {
-            userMessage = "Repository or file not found on GitHub. Check that the repository exists and is accessible.";
-        }
-
         return NextResponse.json(
             {
                 success: false,
-                error: userMessage,
+                error: error.message || "Failed to generate test cases",
             },
             { status: 500 }
         );

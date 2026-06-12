@@ -25,9 +25,6 @@ export type UserRepo = {
     defaultBranch: string
     targetDomain?: string,
     globalInstruction?: string,
-    testEmail?: string,
-    testPassword?: string,
-    clerkSecretKey?: string,
 }
 
 function WorkspaceBody() {
