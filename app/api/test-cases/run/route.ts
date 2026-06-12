@@ -394,7 +394,7 @@ if (needsSignIn) {
         body: JSON.stringify({
           strategy: 'admin',
           session_id: clerkSessionId,
-          identifier: email
+          identifier: autoEmail
         })
       });
       const signInData = await signInRes.json();
@@ -651,33 +651,59 @@ if (needsSignIn) {
     }
   }
 
-  // ---- Final check after all sign-in attempts ----
-  if (!signInSucceeded && (await isOnSignInPage())) {
-    const signInError = 'All sign-in approaches failed. Page still on sign-in. ';
-    console.log('[AUTH] ' + signInError);
-    assert(false, signInError + 'Expected: "' + expectedResultText + '" after sign-in.');
+  // ---- Fallback: if expected text not found, try workspace route with cookie re-injection ---
+  pageBodyText = await getPageText();
+  if (!pageBodyText.toLowerCase().includes(expectedResultText.toLowerCase())) {
+    const isLanding = pageBodyText.toLowerCase().includes('sign in') && pageBodyText.toLowerCase().includes('start free trial');
+    if (jwtToken && isLanding) {
+      const fHostname = new URL(page.url()).hostname;
+      // Re-inject JWT cookie (may have been invalidated by Clerk JS)
+      await page.context().addCookies([
+        { name: '__session', value: jwtToken, domain: fHostname, path: '/' },
+        { name: '__client_uat', value: String(Math.floor(Date.now() / 1000)), domain: fHostname, path: '/' }
+      ]);
+      console.log('[AUTH] Fallback: re-injected session cookie, navigating to /workspace...');
+      await page.goto('${escapedBaseUrl}/workspace', { waitUntil: 'load', timeout: 20000 });
+      await page.waitForLoadState('networkidle').catch(() => {});
+      await page.waitForTimeout(3000);
+      pageBodyText = await getPageText();
+      console.log('[AUTH] Fallback URL:', page.url());
+      // If redirect to sign-in, try SDK sign-in
+      if (page.url().includes('/sign-in') || (await isOnSignInPage())) {
+        console.log('[AUTH] Fallback redirected to sign-in — trying SDK sign-in...');
+        try {
+          const sdkResult = await page.evaluate(async ({ email, password }) => {
+            if (!window.Clerk) return { success: false, error: 'No Clerk' };
+            await window.Clerk.load();
+            const signIn = await window.Clerk.client.signIn.create({
+              strategy: 'password', identifier: email, password
+            });
+            if (signIn.status === 'complete' || signIn.createdSessionId) return { success: true };
+            return { success: false, error: 'SDK status: ' + signIn.status };
+          }, { email: autoEmail, password: autoPassword });
+          if (sdkResult.success) {
+            await page.goto('${escapedBaseUrl}/workspace', { waitUntil: 'load', timeout: 20000 });
+            await page.waitForLoadState('networkidle').catch(() => {});
+            await page.waitForTimeout(3000);
+            pageBodyText = await getPageText();
+          }
+        } catch (e) {}
+      }
+    }
+  }
+  // Final check — fail if still on sign-in
+  if (await isOnSignInPage()) {
+    assert(false, 'All sign-in approaches failed. Page still on sign-in. Expected: "' + expectedResultText + '" after sign-in.');
   }
 } else if (expectedResultText) {
   console.log('[AUTH] No sign-in needed — page loaded directly.');
 }
 
-// ---- Fallback: if on landing page and expected text not found, try workspace route ----
+// ---- Assert expected content ----
 if (expectedResultText) {
   pageBodyText = await getPageText();
   console.log('[ASSERT] Checking for expected text: "' + expectedResultText + '"');
   console.log('[ASSERT] Current page content: "' + pageBodyText.substring(0, 400) + '"');
-  if (!pageBodyText.toLowerCase().includes(expectedResultText.toLowerCase())) {
-    const isLanding = pageBodyText.toLowerCase().includes('sign in') && pageBodyText.toLowerCase().includes('start free trial');
-    if (isLanding) {
-      console.log('[ASSERT] On landing page — navigating to /workspace as fallback...');
-      await page.goto('${escapedBaseUrl}/workspace', { waitUntil: 'load', timeout: 20000 });
-      await page.waitForLoadState('networkidle').catch(() => {});
-      await page.waitForTimeout(3000);
-      pageBodyText = await getPageText();
-      console.log('[ASSERT] Fallback URL:', page.url());
-      console.log('[ASSERT] Fallback content: "' + pageBodyText.substring(0, 400) + '"');
-    }
-  }
   assert(pageBodyText.toLowerCase().includes(expectedResultText.toLowerCase()),
     'Expected: "' + expectedResultText + '" | Page content: "' + pageBodyText.substring(0, 300) + '"');
 }
