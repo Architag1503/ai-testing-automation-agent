@@ -22,6 +22,9 @@ export const repositories = pgTable("repositories", {
   defaultBranch: text("default_branch"),
   targetDomain: varchar("target_domain").default("http://localhost:3000"),
   globalInstruction: text("global_instruction"),
+  testEmail: text("test_email"),
+  testPassword: text("test_password"),
+  clerkSecretKey: text("clerk_secret_key"),
 });
 
 export const TestCasesTable = pgTable("test_cases", {
@@ -56,6 +59,23 @@ export const TestCasesTable = pgTable("test_cases", {
   sessionUrl: varchar("session_url", { length: 500 })
 });
 
+
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  planName: text("plan_name").notNull(),
+  planBadge: text("plan_badge"),
+  creditsToGrant: integer("credits_to_grant").default(0).notNull(),
+  priceMonthly: integer("price_monthly"),
+  priceAnnually: integer("price_annually"),
+  billingPeriod: text("billing_period"),
+  isActive: integer("is_active").default(0).notNull(),
+  razorpayOrderId: text("razorpay_order_id"),
+  razorpayPaymentId: text("razorpay_payment_id"),
+  status: text("status").default("active").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+});
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

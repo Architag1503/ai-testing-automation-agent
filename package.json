@@ -29,6 +29,7 @@
     "lucide-react": "^0.475.0",
     "next": "^16.2.6",
     "playwright-core": "^1.60.0",
+    "razorpay": "^2.9.6",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "stripe": "^22.1.1",
