@@ -6,7 +6,6 @@ import { Button } from '../ui/button'
 import { Card, CardContent } from '../ui/card'
 import EmptyWorkspace from './EmptyWorkspace'
 import axios from 'axios'
-import { useRouter } from 'next/navigation'
 import RepoDialog from './RepoDialog'
 import UserRepoList from './UserRepoList'
 
@@ -33,7 +32,6 @@ export type UserRepo = {
 function WorkspaceBody() {
 
     const { userDetail } = useContext(UserDetailContext);
-    const router = useRouter();
     const [token, setToken] = useState('');
     const [userRepoList, setUserRepoList] = useState<UserRepo[]>([]);
 
@@ -52,7 +50,7 @@ function WorkspaceBody() {
     }
 
     const onAddRepo = async () => {
-        router.push('/api/github')
+        window.location.href = '/api/github'
     }
 
     const GetUserAddedRepoList = async () => {
