@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation"
+import { NextResponse } from "next/server";
 
 export async function GET() {
 
@@ -8,5 +8,5 @@ export async function GET() {
         scope: "repo read:user"
     })
 
-    redirect(`https://github.com/login/oauth/authorize?${params}`)
+    return NextResponse.redirect(`https://github.com/login/oauth/authorize?${params}`)
 }
