@@ -26,5 +26,9 @@ services:
         sync: false
       - key: NEXT_PUBLIC_RAZORPAY_KEY_ID
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: BROWSERBASE_API_KEY
+        sync: false
     healthCheckPath: /
     autoDeploy: true
