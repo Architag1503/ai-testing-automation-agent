@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, Type } from "@google/genai";
 import { db, TestCasesTable } from "@/db";
 import { cookies } from "next/headers";
+import { getInstallationAccessToken } from '@/lib/github-app';
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY!,
@@ -148,8 +149,9 @@ async function readGithubFile({
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const cookiesStore = await cookies();
-        const githubToken = cookiesStore.get('gh_token')?.value;
+        const cookieStore = await cookies();
+        const installationId = cookieStore.get('gh_installation_id')?.value;
+        const cachedToken = cookieStore.get('gh_app_token')?.value;
 
         const {
             userId,
@@ -159,13 +161,25 @@ export async function POST(req: NextRequest) {
             branch = "main",
         } = body;
 
-        if (!userId || !owner || !repo || !githubToken) {
+        if (!userId || !owner || !repo || !installationId) {
             return NextResponse.json(
                 {
-                    error: "userId, owner, repo and githubToken are required",
+                    error: "userId, owner, repo and GitHub App installation are required",
                 },
                 { status: 400 }
             );
+        }
+
+        const githubToken = cachedToken || await getInstallationAccessToken(installationId);
+
+        if (!cachedToken) {
+            cookieStore.set('gh_app_token', githubToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 60 * 60,
+                path: '/',
+            });
         }
 
         // 1. Get repo tree

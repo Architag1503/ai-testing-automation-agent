@@ -32,30 +32,31 @@ export type UserRepo = {
 function WorkspaceBody() {
 
     const { userDetail } = useContext(UserDetailContext);
-    const [token, setToken] = useState('');
+    const [installationId, setInstallationId] = useState<string | null>(null);
     const [userRepoList, setUserRepoList] = useState<UserRepo[]>([]);
 
     useEffect(() => {
-        GetGithubUserToken();
+        CheckGitHubAppInstallation();
     }, [])
 
     useEffect(() => {
         userDetail && GetUserAddedRepoList();
     }, [userDetail])
 
-    const GetGithubUserToken = async () => {
+    const CheckGitHubAppInstallation = async () => {
         try {
-            const result = await axios.get('/api/github/token');
-            console.log(result.data.token);
-            setToken(result.data.token);
+            const result = await axios.get('/api/github/app/token');
+            if (result.data.token) {
+                setInstallationId('installed');
+            }
         } catch (err) {
-            console.error("Failed to get GitHub token:", err);
-            setToken('');
+            console.log("No GitHub App installation found");
+            setInstallationId(null);
         }
     }
 
-    const onAddRepo = async () => {
-        window.location.href = '/api/github'
+    const onInstallApp = async () => {
+        window.location.href = '/api/github/app'
     }
 
     const GetUserAddedRepoList = async () => {
@@ -74,11 +75,11 @@ function WorkspaceBody() {
             <Card className={'mt-5 flex justify-between p-4 border rounded-lg'}>
                 <div className='flex items-center gap-5'>
                     <Image src={'/github.png'} alt={'github'} width={40} height={40} />
-                    <h2 className='text-lg'>Connect Github & Add Repository</h2>
+                    <h2 className='text-lg'>Connect GitHub & Add Repository</h2>
                 </div>
                 <div>
                     {
-                        !token ? <Button onClick={onAddRepo}>Setup</Button>
+                        !installationId ? <Button onClick={onInstallApp}>Install GitHub App</Button>
                             : <RepoDialog setRefreshPage={(refresh: boolean) => GetUserAddedRepoList()} />
                     }
                 </div>

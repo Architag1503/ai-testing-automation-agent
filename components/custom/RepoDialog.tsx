@@ -52,8 +52,12 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
             setRepoList(result.data)
         } catch (err: any) {
             console.error("Failed to fetch repositories:", err);
-            const errMsg = err.response?.data?.error || err.message || "Failed to load GitHub repositories.";
-            setError(errMsg);
+            if (err.response?.status === 401) {
+                setError("GitHub App not installed. Please install the GitHub App first.");
+            } else {
+                const errMsg = err.response?.data?.error || err.message || "Failed to load GitHub repositories.";
+                setError(errMsg);
+            }
         } finally {
             setLoading(false);
         }
@@ -105,7 +109,7 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
                 <DialogHeader>
                     <DialogTitle>Add Repository</DialogTitle>
                     <DialogDescription>
-                        Search and select one of your GitHub repositories
+                        Select one of your GitHub repositories (requires GitHub App installation)
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-4 py-2">
@@ -125,16 +129,34 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
                         <div className="p-4 border border-red-200 bg-red-50 text-red-700 rounded-xl flex flex-col gap-3">
                             <div className="flex flex-col gap-1">
                                 <p className="font-semibold text-sm">Error: {error}</p>
-                                <p className="text-xs text-red-600">Your GitHub connection might be expired, invalid, or requires re-authentication.</p>
+                                <p className="text-xs text-red-600">
+                                    {error.includes('not installed') ? (
+                                        <>
+                                            Install the GitHub App on your account/organization first.
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                className="w-fit text-blue-700 border-blue-300 bg-white hover:bg-blue-50 mt-2"
+                                                onClick={() => window.location.href = '/api/github/app'}
+                                            >
+                                                Install GitHub App
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        'Your GitHub App installation might need to be refreshed.'
+                                    )}
+                                </p>
                             </div>
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="w-fit text-red-700 border-red-300 bg-white hover:bg-red-50"
-                                onClick={() => window.location.href = '/api/github'}
-                            >
-                                Reconnect GitHub
-                            </Button>
+                            {!error.includes('not installed') && (
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="w-fit text-red-700 border-red-300 bg-white hover:bg-red-50"
+                                    onClick={() => GetRepoList()}
+                                >
+                                    Retry
+                                </Button>
+                            )}
                         </div>
                     )}
 

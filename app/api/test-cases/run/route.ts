@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { Browserbase } from "@browserbasehq/sdk";
 import { chromium } from "playwright-core";
+import { getInstallationAccessToken } from '@/lib/github-app';
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY!,
@@ -100,14 +101,27 @@ export async function POST(req: NextRequest) {
 
         // 2. Generate script using Gemini if forced, or if no script is cached
         if (forceRegenerate) {
-            const cookiesStore = await cookies();
-            const githubToken = cookiesStore.get("gh_token")?.value;
+            const cookieStore = await cookies();
+            const installationId = cookieStore.get('gh_installation_id')?.value;
+            const cachedToken = cookieStore.get('gh_app_token')?.value;
 
-            if (!githubToken) {
+            if (!installationId) {
                 return NextResponse.json(
-                    { error: "GitHub authentication token is missing or expired" },
+                    { error: "GitHub App installation is missing" },
                     { status: 401 }
                 );
+            }
+
+            const githubToken = cachedToken || await getInstallationAccessToken(installationId);
+
+            if (!cachedToken) {
+                cookieStore.set('gh_app_token', githubToken, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: 'lax',
+                    maxAge: 60 * 60,
+                    path: '/',
+                });
             }
 
             // Fetch target files context
@@ -367,7 +381,7 @@ Just return the executable code.
             console.error("Script execution error:", execError);
             const errMsg: string = execError.message || String(execError);
             logs.push(`[SYSTEM ERROR] Script execution failed: ${errMsg}`);
- 
+  
             // Provide actionable hints for common failure patterns
             const isTunnelError = errMsg.includes("503") || 
                                  errMsg.includes("408") || 
