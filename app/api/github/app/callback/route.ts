@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { getInstallationAccessToken, getUserInstallations, generateGitHubAppJWT } from '@/lib/github-app';
+import { getInstallationAccessToken, getInstallationDetails } from '@/lib/github-app';
 import { db, repositories } from '@/db';
 import { eq, and } from 'drizzle-orm';
 
@@ -8,17 +8,12 @@ export async function GET(req: NextRequest) {
   const installationId = req.nextUrl.searchParams.get('installation_id');
   const setupAction = req.nextUrl.searchParams.get('setup_action');
 
-  if (!installationId || setupAction !== 'install') {
+  if (!installationId || (setupAction !== 'install' && setupAction !== 'update')) {
     return NextResponse.redirect(new URL('/workspace?error=invalid_callback', req.url));
   }
 
   try {
-    const jwt = await generateGitHubAppJWT();
-    const installations = await getUserInstallations(jwt);
-    
-    const installation = installations.installations?.find(
-      (inst: any) => inst.id.toString() === installationId
-    );
+    const installation = await getInstallationDetails(installationId);
 
     if (!installation) {
       return NextResponse.redirect(new URL('/workspace?error=installation_not_found', req.url));

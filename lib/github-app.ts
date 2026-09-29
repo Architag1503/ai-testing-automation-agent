@@ -56,8 +56,9 @@ export async function getInstallationAccessToken(installationId: string): Promis
   return data.token;
 }
 
-export async function getUserInstallations(jwt: string) {
-  const res = await fetch('https://api.github.com/user/installations', {
+export async function getInstallationDetails(installationId: string) {
+  const jwt = await generateGitHubAppJWT();
+  const res = await fetch(`https://api.github.com/app/installations/${installationId}`, {
     headers: {
       Authorization: `Bearer ${jwt}`,
       Accept: 'application/vnd.github.v3+json',
@@ -66,7 +67,7 @@ export async function getUserInstallations(jwt: string) {
   });
 
   if (!res.ok) {
-    throw new Error('Failed to fetch user installations');
+    throw new Error('Failed to fetch installation details');
   }
 
   return res.json();
