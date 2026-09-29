@@ -34,6 +34,7 @@ function WorkspaceBody() {
     const { userDetail } = useContext(UserDetailContext);
     const [installationId, setInstallationId] = useState<string | null>(null);
     const [userRepoList, setUserRepoList] = useState<UserRepo[]>([]);
+    const [githubError, setGithubError] = useState<string | null>(null);
 
     const CheckGitHubAppInstallation = async () => {
         try {
@@ -54,11 +55,30 @@ function WorkspaceBody() {
         setUserRepoList(result.data);
     }
 
-    useEffect(() => { CheckGitHubAppInstallation(); }, [])
+    useEffect(() => {
+        CheckGitHubAppInstallation();
+        const reason = new URLSearchParams(window.location.search).get('githubError');
+        const messages: Record<string, string> = {
+            not_configured: 'GitHub App setup is incomplete. Set GITHUB_APP_NAME to the app slug, and configure GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY in Render and Vercel.',
+            credentials_invalid: 'The GitHub App credentials are invalid. Verify GITHUB_APP_ID and upload the matching RSA private key in Render and Vercel.',
+            setup_url_invalid: 'GITHUB_APP_SETUP_URL is not a valid URL. Set it to your production domain followed by /api/github/app/callback.',
+            app_url_invalid: 'NEXT_PUBLIC_APP_URL is invalid. Set it to this deployment’s public HTTPS URL.',
+            setup_url_mismatch: 'GitHub App setup URLs do not match. Set GITHUB_APP_SETUP_URL and the GitHub App Setup URL to this domain’s /api/github/app/callback, and turn off “Request user authorization (OAuth) during installation”.',
+            invalid_callback: 'GitHub did not return a valid installation. Retry the install and approve repository access.',
+            installation_failed: 'GitHub installation could not be verified. Check GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY, then try again.',
+        };
+        if (reason && messages[reason]) {
+            setGithubError(messages[reason]);
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('githubError');
+            window.history.replaceState({}, '', cleanUrl);
+        }
+    }, [])
     useEffect(() => { if (userDetail) GetUserAddedRepoList(); }, [userDetail])
 
     return (
         <div>
+            {githubError && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{githubError}</div>}
             <div className='flex justify-between items-center'>
                 <h2 className='text-4xl font-medium'>Workspace</h2>
                 <h2 className='text-blue-800 bg-blue-100 px-2 rounded-lg'>Remaining Credits: {userDetail?.credits}</h2>

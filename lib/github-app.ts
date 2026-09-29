@@ -1,4 +1,5 @@
 import { SignJWT } from 'jose';
+import { createPrivateKey } from 'node:crypto';
 
 export async function generateGitHubAppJWT(): Promise<string> {
   const appId = process.env.GITHUB_APP_ID;
@@ -8,18 +9,18 @@ export async function generateGitHubAppJWT(): Promise<string> {
     throw new Error('GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY must be set');
   }
 
-  const key = await crypto.subtle.importKey(
-    'pkcs8',
-    new TextEncoder().encode(
-      privateKey
-        .replace('-----BEGIN RSA PRIVATE KEY-----', '')
-        .replace('-----END RSA PRIVATE KEY-----', '')
-        .replace(/\s/g, '')
-    ),
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
+  // Node parses both GitHub's traditional PKCS#1 PEM (RSA PRIVATE KEY)
+  // and PKCS#8 PEM (PRIVATE KEY). WebCrypto's pkcs8 import rejected the
+  // PKCS#1 format shown in the deployment environment example.
+  let key: ReturnType<typeof createPrivateKey>;
+  try {
+    key = createPrivateKey(privateKey);
+  } catch {
+    throw new Error('GITHUB_APP_PRIVATE_KEY is not a valid PEM private key');
+  }
+  if (key.asymmetricKeyType !== 'rsa') {
+    throw new Error('GITHUB_APP_PRIVATE_KEY must be an RSA private key');
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const jwt = await new SignJWT({})

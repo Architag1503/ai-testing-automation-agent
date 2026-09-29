@@ -5,7 +5,7 @@ import { getInstallationDetails } from "@/lib/github-app";
 import { eq } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+  const baseUrl = req.nextUrl.origin;
   const account = await getAuthenticatedAccount();
   if (!account) return NextResponse.redirect(new URL("/sign-in?redirect_url=/workspace", baseUrl));
 
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const installationId = req.nextUrl.searchParams.get("installation_id");
   const setupAction = req.nextUrl.searchParams.get("setup_action");
   if (!suppliedState || !expectedState || suppliedState !== expectedState || !installationId || !/^\d+$/.test(installationId) || !["install", "update"].includes(setupAction || "")) {
-    return NextResponse.redirect(new URL("/workspace?error=invalid_github_callback", baseUrl));
+    return NextResponse.redirect(new URL("/workspace?githubError=invalid_callback", baseUrl));
   }
 
   try {
@@ -27,6 +27,6 @@ export async function GET(req: NextRequest) {
     return response;
   } catch (error) {
     console.error("GitHub App callback failed", error);
-    return NextResponse.redirect(new URL("/workspace?error=github_installation_failed", baseUrl));
+    return NextResponse.redirect(new URL("/workspace?githubError=installation_failed", baseUrl));
   }
 }

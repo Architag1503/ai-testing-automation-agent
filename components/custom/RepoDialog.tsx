@@ -33,6 +33,8 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
     const [importLoading, setImportLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [importError, setImportError] = useState<string | null>(null);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
     const [selectedRepo, setSelectedRepo] = useState<Repo | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [directRepoInput, setDirectRepoInput] = useState('');
@@ -99,26 +101,30 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
     }, [repoList, searchTerm]);
 
     const SaveRepoToDB = async () => {
-
         if (!selectedRepo) {
             return;
         }
-
-        const result = await axios.post('/api/user-repo', {
-            repoId: selectedRepo.id,
-            name: selectedRepo.name,
-            full_name: selectedRepo.full_name,
-            private_: selectedRepo.private_,
-            html_url: selectedRepo.html_url,
-            description: selectedRepo.description,
-            owner: selectedRepo.owner,
-            language: selectedRepo.language,
-            default_branch: selectedRepo.default_branch,
-        })
-
-        console.log("Saved repo result:", result.data);
-        setIsOpen(false);
-        setRefreshPage(true);
+        setSaving(true);
+        setSaveError(null);
+        try {
+            await axios.post('/api/user-repo', {
+                repoId: selectedRepo.id,
+                name: selectedRepo.name,
+                full_name: selectedRepo.full_name,
+                private_: selectedRepo.private_,
+                html_url: selectedRepo.html_url,
+                description: selectedRepo.description,
+                owner: selectedRepo.owner,
+                language: selectedRepo.language,
+                default_branch: selectedRepo.default_branch,
+            });
+            setIsOpen(false);
+            setRefreshPage(true);
+        } catch (err: any) {
+            setSaveError(err.response?.data?.error || "Could not add this repository. Please try again.");
+        } finally {
+            setSaving(false);
+        }
 
     }
 
@@ -154,6 +160,7 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
                 </div>
 
                 <div className="flex flex-col gap-4 py-2">
+                    {saveError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-700">{saveError}</p>}
                     {mode === 'direct' ? (
                         <div className="flex flex-col gap-3 p-3 bg-gray-50 border rounded-xl">
                             <p className="text-xs text-gray-600 font-medium">
@@ -269,8 +276,8 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
                     <DialogClose asChild>
                         <Button type="button" variant="ghost">Cancel</Button>
                     </DialogClose>
-                    <Button onClick={() => SaveRepoToDB()} disabled={loading || !selectedRepo}>
-                        {selectedRepo ? `Add ${selectedRepo.name}` : 'Add Repo'}
+                    <Button onClick={() => SaveRepoToDB()} disabled={loading || saving || !selectedRepo}>
+                        {saving ? 'Adding...' : selectedRepo ? `Add ${selectedRepo.name}` : 'Add Repo'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

@@ -22,6 +22,13 @@
       "when": 1790704396000,
       "tag": "0002_account_usage_and_ci_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790706465000,
+      "tag": "0003_github_installation_id",
+      "breakpoints": true
     }
   ]
 }

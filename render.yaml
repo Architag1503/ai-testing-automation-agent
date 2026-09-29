@@ -3,7 +3,7 @@ services:
     name: ai-test-automation-agent
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci && npm run db:migrate && npm run build
     startCommand: npm run start
     envVars:
       - key: NODE_VERSION
