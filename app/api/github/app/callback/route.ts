@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
-    return NextResponse.redirect(`${baseUrl}/workspace`);
+    return NextResponse.redirect(`${baseUrl}/workspace?installation_id=${installationId}`);
   } catch (error: any) {
     console.error('GitHub App callback error:', error);
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;

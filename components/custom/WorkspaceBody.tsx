@@ -8,6 +8,7 @@ import EmptyWorkspace from './EmptyWorkspace'
 import axios from 'axios'
 import RepoDialog from './RepoDialog'
 import UserRepoList from './UserRepoList'
+import { useSearchParams } from 'next/navigation'
 
 export type UserRepo = {
     id: number,
@@ -34,18 +35,28 @@ function WorkspaceBody() {
     const { userDetail } = useContext(UserDetailContext);
     const [installationId, setInstallationId] = useState<string | null>(null);
     const [userRepoList, setUserRepoList] = useState<UserRepo[]>([]);
+    const searchParams = useSearchParams();
 
     useEffect(() => {
-        CheckGitHubAppInstallation();
-    }, [])
+        const queryInstId = searchParams?.get('installation_id');
+        if (queryInstId) {
+            setInstallationId(queryInstId);
+            // Save query installation_id to localStorage as backup
+            try { localStorage.setItem('gh_installation_id', queryInstId); } catch (e) {}
+        }
+        CheckGitHubAppInstallation(queryInstId || undefined);
+    }, [searchParams])
 
     useEffect(() => {
         userDetail && GetUserAddedRepoList();
     }, [userDetail])
 
-    const CheckGitHubAppInstallation = async () => {
+    const CheckGitHubAppInstallation = async (paramId?: string) => {
         try {
-            const result = await axios.get('/api/github/app/token');
+            const savedLocalId = typeof window !== 'undefined' ? localStorage.getItem('gh_installation_id') : null;
+            const targetId = paramId || savedLocalId || '';
+            const url = targetId ? `/api/github/app/token?installation_id=${targetId}` : '/api/github/app/token';
+            const result = await axios.get(url);
             if (result.data.token) {
                 setInstallationId('installed');
             }
@@ -72,20 +83,23 @@ function WorkspaceBody() {
                 <h2 className='text-blue-800 bg-blue-100 px-2 rounded-lg'>Remaining Credits: {userDetail?.credits}</h2>
             </div>
 
-            <Card className={'mt-5 flex justify-between p-4 border rounded-lg'}>
+            <Card className={'mt-5 flex justify-between p-4 border rounded-lg items-center flex-wrap gap-4'}>
                 <div className='flex items-center gap-5'>
                     <Image src={'/github.png'} alt={'github'} width={40} height={40} />
-                    <h2 className='text-lg'>Connect GitHub & Add Repository</h2>
+                    <div>
+                        <h2 className='text-lg font-semibold'>Connect GitHub & Add Repository</h2>
+                        <p className='text-xs text-gray-500'>Add any repository from your GitHub App installation or import public repos directly</p>
+                    </div>
                 </div>
-                <div>
-                    {
-                        !installationId ? <Button onClick={onInstallApp}>Install GitHub App</Button>
-                            : <RepoDialog setRefreshPage={(refresh: boolean) => GetUserAddedRepoList()} />
-                    }
+                <div className='flex items-center gap-3'>
+                    <RepoDialog setRefreshPage={(refresh: boolean) => GetUserAddedRepoList()} />
+                    <Button variant="outline" onClick={onInstallApp}>
+                        {installationId ? 'Manage GitHub App' : 'Install GitHub App'}
+                    </Button>
                 </div>
             </Card>
 
-            {!userRepoList ? <Card className='mt-10'>
+            {!userRepoList || userRepoList.length === 0 ? <Card className='mt-10'>
                 <CardContent>
                     <EmptyWorkspace />
                 </CardContent>

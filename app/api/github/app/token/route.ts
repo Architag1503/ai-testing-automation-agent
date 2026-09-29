@@ -1,14 +1,15 @@
 import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getInstallationAccessToken } from '@/lib/github-app';
 import { currentUser } from '@clerk/nextjs/server';
 import { db, users } from '@/db';
 import { eq } from 'drizzle-orm';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const cookieStore = await cookies();
-    let installationId = cookieStore.get('gh_installation_id')?.value;
+    const paramId = req.nextUrl.searchParams.get('installation_id');
+    let installationId = paramId || cookieStore.get('gh_installation_id')?.value;
 
     // Fallback: check DB for logged-in user if cookie is missing/cleared
     if (!installationId) {
@@ -18,13 +19,6 @@ export async function GET() {
         const [userRecord] = await db.select().from(users).where(eq(users.email, email));
         if (userRecord?.installationId) {
           installationId = userRecord.installationId;
-          cookieStore.set('gh_installation_id', installationId, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24 * 30,
-            path: '/',
-          });
         }
       }
     }
@@ -32,6 +26,15 @@ export async function GET() {
     if (!installationId) {
       return NextResponse.json({ error: 'No GitHub App installation found' }, { status: 401 });
     }
+
+    // Restore cookie if we have a valid installationId
+    cookieStore.set('gh_installation_id', installationId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30,
+      path: '/',
+    });
 
     const token = await getInstallationAccessToken(installationId);
 
