@@ -6,23 +6,21 @@ export async function GET() {
   try {
     const cookieStore = await cookies();
     const installationId = cookieStore.get('gh_installation_id')?.value;
-    const cachedToken = cookieStore.get('gh_app_token')?.value;
 
     if (!installationId) {
       return NextResponse.json({ error: 'No GitHub App installation found' }, { status: 401 });
     }
 
-    const token = cachedToken || await getInstallationAccessToken(installationId);
+    // Always fetch a fresh token for the installation to avoid stale permissions
+    const token = await getInstallationAccessToken(installationId);
 
-    if (!cachedToken) {
-      cookieStore.set('gh_app_token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60,
-        path: '/',
-      });
-    }
+    cookieStore.set('gh_app_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60,
+      path: '/',
+    });
 
     const repos = await getInstallationRepos(installationId, token);
 

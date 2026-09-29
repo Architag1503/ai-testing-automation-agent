@@ -90,10 +90,14 @@ export async function getInstallationRepos(installationId: string, token: string
     );
 
     if (!res.ok) {
+      const errorText = await res.text().catch(() => '');
+      console.error(`Failed to fetch installation repos. Status: ${res.status}, Body: ${errorText}`);
       throw new Error(`Failed to fetch repos: ${res.statusText}`);
     }
 
     const data = await res.json();
+    console.log(`Fetched repos for installation ${installationId}: count=${data.total_count}, selection=${data.repository_selection}`);
+
     if (!data.repositories?.length) break;
 
     allRepos.push(...data.repositories);
