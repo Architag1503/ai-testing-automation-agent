@@ -1,8 +1,9 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { getInstallationAccessToken, getInstallationDetails } from '@/lib/github-app';
-import { db, repositories } from '@/db';
-import { eq, and } from 'drizzle-orm';
+import { db, users } from '@/db';
+import { eq } from 'drizzle-orm';
+import { currentUser } from '@clerk/nextjs/server';
 
 export async function GET(req: NextRequest) {
   const installationId = req.nextUrl.searchParams.get('installation_id');
@@ -35,9 +36,22 @@ export async function GET(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60, // 1 hour - tokens expire in 1 hour
+      maxAge: 60 * 60,
       path: '/',
     });
+
+    // Permanently link installationId to user record in DB
+    try {
+      const clerkUser = await currentUser();
+      const email = clerkUser?.primaryEmailAddress?.emailAddress;
+      if (email) {
+        await db.update(users)
+          .set({ installationId })
+          .where(eq(users.email, email));
+      }
+    } catch (dbErr) {
+      console.error('Error linking installationId to user in DB:', dbErr);
+    }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
     return NextResponse.redirect(`${baseUrl}/workspace`);
