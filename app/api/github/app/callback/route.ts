@@ -6,17 +6,18 @@ import { eq, and } from 'drizzle-orm';
 
 export async function GET(req: NextRequest) {
   const installationId = req.nextUrl.searchParams.get('installation_id');
-  const setupAction = req.nextUrl.searchParams.get('setup_action');
 
-  if (!installationId || (setupAction !== 'install' && setupAction !== 'update')) {
-    return NextResponse.redirect(new URL('/workspace?error=invalid_callback', req.url));
+  if (!installationId) {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+    return NextResponse.redirect(`${baseUrl}/workspace?error=invalid_callback`);
   }
 
   try {
     const installation = await getInstallationDetails(installationId);
 
     if (!installation) {
-      return NextResponse.redirect(new URL('/workspace?error=installation_not_found', req.url));
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+      return NextResponse.redirect(`${baseUrl}/workspace?error=installation_not_found`);
     }
 
     const token = await getInstallationAccessToken(installationId);
@@ -38,9 +39,11 @@ export async function GET(req: NextRequest) {
       path: '/',
     });
 
-    return NextResponse.redirect(new URL('/workspace', req.url));
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+    return NextResponse.redirect(`${baseUrl}/workspace`);
   } catch (error: any) {
     console.error('GitHub App callback error:', error);
-    return NextResponse.redirect(new URL(`/workspace?error=${encodeURIComponent(error.message)}`, req.url));
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+    return NextResponse.redirect(`${baseUrl}/workspace?error=${encodeURIComponent(error.message)}`);
   }
 }
