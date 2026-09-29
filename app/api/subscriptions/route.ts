@@ -22,7 +22,11 @@ export async function GET() {
       .from(subscriptions)
       .where(eq(subscriptions.userId, userResult[0].id));
 
-    return NextResponse.json({ subscriptions: userSubs });
+    const now = new Date();
+    return NextResponse.json({ subscriptions: userSubs.map((subscription) => ({
+      ...subscription,
+      isActive: subscription.expiresAt && subscription.expiresAt <= now ? 0 : subscription.isActive,
+    })) });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

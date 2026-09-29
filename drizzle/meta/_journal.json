@@ -15,6 +15,13 @@
       "when": 1781718880124,
       "tag": "0001_steep_mattie_franklin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790704396000,
+      "tag": "0002_account_usage_and_ci_keys",
+      "breakpoints": true
     }
   ]
 }

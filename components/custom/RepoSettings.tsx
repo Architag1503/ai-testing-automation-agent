@@ -26,10 +26,12 @@ function RepoSettings({ repo, setReload }: props) {
     const [repoSettings, setRepoSettings] = useState({
         targetDomain: repo?.targetDomain || '',
         globalInstruction: repo?.globalInstruction || '',
-        testEmail: repo?.testEmail || '',
-        testPassword: repo?.testPassword || '',
-        clerkSecretKey: repo?.clerkSecretKey || '',
+        testEmail: '',
+        testPassword: '',
     })
+    const [clearTestCredentials, setClearTestCredentials] = useState(false)
+    const [newCiKey, setNewCiKey] = useState('')
+    const [isGeneratingCiKey, setIsGeneratingCiKey] = useState(false)
 
     const handleSaveSettings = async () => {
         const result = await axios.post('/api/user-repo/settings', {
@@ -38,12 +40,23 @@ function RepoSettings({ repo, setReload }: props) {
             globalInstruction: repoSettings.globalInstruction,
             testEmail: repoSettings.testEmail,
             testPassword: repoSettings.testPassword,
-            clerkSecretKey: repoSettings.clerkSecretKey,
+            clearTestCredentials,
         })
 
         console.log(result?.data);
         setIsOpen(false);
         setReload();
+    }
+
+    const generateCiKey = async () => {
+        setIsGeneratingCiKey(true)
+        try {
+            const response = await axios.post('/api/user-repo/settings', { repoId: repo.repoId, generateCiKey: true })
+            setNewCiKey(response.data.ciApiKey)
+            setReload()
+        } catch (error: any) {
+            window.alert(error.response?.data?.error || 'Could not generate CI key')
+        } finally { setIsGeneratingCiKey(false) }
     }
 
     return (
@@ -71,7 +84,7 @@ function RepoSettings({ repo, setReload }: props) {
                         <Textarea value={repoSettings?.globalInstruction}
                             onChange={(e) => setRepoSettings({ ...repoSettings, globalInstruction: e.target.value })}
                             placeholder='Instructions' className='mt-1' />
-                        <p className='text-xs text-gray-400 mt-1'>Include any authentication credentials, cookies, setup or teardown instructions. These are automatically appended to Gemini's Prompt</p>
+                        <p className='text-xs text-gray-400 mt-1'>Describe stable setup details and selectors. Keep passwords and API keys in the dedicated credential fields below.</p>
                     </div>
                     <div className='mt-4 pt-4 border-t'>
                         <h4 className='text-sm font-medium text-gray-700 mb-2'>Test Credentials (for auto sign-in)</h4>
@@ -80,30 +93,17 @@ function RepoSettings({ repo, setReload }: props) {
                                 <label className='text-gray-500'>EMAIL</label>
                                 <Input value={repoSettings?.testEmail}
                                     onChange={(e) => setRepoSettings({ ...repoSettings, testEmail: e.target.value })}
-                                    placeholder='test@example.com' className='mt-1' type='email' />
+                                    placeholder={repo.hasTestCredentials ? 'Saved; leave blank to keep' : 'test@example.com'} className='mt-1' type='email' />
                             </div>
                             <div>
                                 <label className='text-gray-500'>PASSWORD</label>
                                 <Input value={repoSettings?.testPassword}
                                     onChange={(e) => setRepoSettings({ ...repoSettings, testPassword: e.target.value })}
-                                    placeholder='Password' className='mt-1' type='password' />
+                                    placeholder={repo.hasTestCredentials ? 'Saved; leave blank to keep' : 'Password'} className='mt-1' type='password' />
                             </div>
                         </div>
-                        <p className='text-xs text-gray-400 mt-2'>If provided, the test script will automatically sign in before testing protected routes.</p>
-                    </div>
-                    <div className='mt-4 pt-4 border-t'>
-                        <h4 className='text-sm font-medium text-gray-700 mb-2'>Clerk Secret Key (optional)</h4>
-                        <div>
-                            <label className='text-gray-500'>CLERK SECRET KEY</label>
-                            <Input value={repoSettings?.clerkSecretKey}
-                                onChange={(e) => setRepoSettings({ ...repoSettings, clerkSecretKey: e.target.value })}
-                                placeholder='sk_test_... or sk_live_...' className='mt-1' type='password' />
-                            <p className='text-xs text-gray-400 mt-2'>
-                                If provided, the test runner will attempt server-side session injection (fast-path auth). 
-                                Otherwise, email/password sign-in through the UI form is used. Get this from 
-                                <code className='bg-gray-100 px-1 rounded mx-1 text-[11px]'> Clerk Dashboard → API Keys</code>
-                            </p>
-                        </div>
+                        <p className='text-xs text-gray-400 mt-2'>Credentials are stored server-side and are never sent to the AI model. Add them here when tests need to sign in through your app.</p>
+                        {repo.hasTestCredentials && <button type='button' onClick={() => setClearTestCredentials(!clearTestCredentials)} className='text-xs text-rose-600 underline mt-2'>{clearTestCredentials ? 'Saved credentials will be removed' : 'Clear saved credentials'}</button>}
                     </div>
 
                     <div className='mt-4 pt-4 border-t'>
@@ -116,11 +116,15 @@ function RepoSettings({ repo, setReload }: props) {
                         <div className='bg-gray-50 rounded p-3 text-xs font-mono border'>
                             <div className='text-gray-500 mb-1'>Required GitHub Secrets:</div>
                             <div className='text-gray-700'>
-                                TESTRIX_API_KEY = {repoSettings.clerkSecretKey ? "✅ Set" : "⚠️ Set Clerk key above"}<br/>
-                                TESTRIX_REPO_ID = {repo.id}<br/>
+                                TESTRIX_API_KEY = {repo.hasCiKey ? "✅ Set (generate or rotate below)" : "⚠️ Generate a key below"}<br/>
+                                TESTRIX_REPO_ID = {repo.repoId}<br/>
                                 TESTRIX_API_URL = https://app.testrix.ai
                             </div>
                         </div>
+                        {newCiKey && <div className='mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs'>Copy this key now; it is shown only once.<Input readOnly value={newCiKey} className='mt-1 font-mono' onFocus={(e) => e.currentTarget.select()} /></div>}
+                        <Button type='button' variant='outline' disabled={isGeneratingCiKey} onClick={generateCiKey} className='mt-2'>
+                            {isGeneratingCiKey ? 'Generating…' : repo.hasCiKey ? 'Rotate CI API Key' : 'Generate CI API Key'}
+                        </Button>
                         <button
                             onClick={() => {
                                 const ds = "$";
@@ -152,7 +156,6 @@ function RepoSettings({ repo, setReload }: props) {
                                     "            -d '{",
                                     '              "repoId": ' + ds + "{{ secrets.TESTRIX_REPO_ID }},",
                                     '              "repoFullName": "' + ds + "{{ github.repository }}\",",
-                                    '              "branch": "' + ds + "{{ github.head_ref || github.ref_name }}\",",
                                     '              "commitSha": "' + ds + "{{ github.event.pull_request.head.sha || github.sha }}\",",
                                     '              "prNumber": ' + ds + "{{ github.event.pull_request.number || 0 }},",
                                     '              "githubToken": "' + ds + '{{ secrets.GITHUB_TOKEN }}"',

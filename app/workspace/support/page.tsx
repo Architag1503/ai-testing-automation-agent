@@ -84,6 +84,7 @@ type ChatMessage = {
 }
 
 export default function Support() {
+  const messageCounter = useRef(0)
   // Contact form states
   const [formName, setFormName] = useState("")
   const [formEmail, setFormEmail] = useState("")
@@ -181,7 +182,7 @@ export default function Support() {
     if (!text.trim()) return
 
     const newMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
+      id: `user-${++messageCounter.current}`,
       sender: "user",
       text: text,
       timestamp: new Date()
@@ -328,7 +329,7 @@ export default function Support() {
                     <div className="space-y-4">
                       <div>
                         <h2 className="text-lg font-bold text-slate-900">Submit a Support Ticket</h2>
-                        <p className="text-xs text-slate-500">We'll review and reply to your ticket immediately.</p>
+                        <p className="text-xs text-slate-500">We&apos;ll review and reply to your ticket immediately.</p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -579,7 +580,7 @@ export default function Support() {
 
             <AccordionItem value="support-2" className="border-b border-slate-100">
               <AccordionTrigger className="text-slate-800 font-semibold hover:text-emerald-600 text-sm py-4">
-                Can I sync custom local repos that aren't on GitHub?
+                Can I sync custom local repos that aren&apos;t on GitHub?
               </AccordionTrigger>
               <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">
                 Currently, Testrix utilizes GitHub APIs to sync branches and load component contexts directly. For private local repositories, you can create a private GitHub repository, sync it, and then target your local server using a secure LocalTunnel or Ngrok endpoint.
@@ -600,7 +601,7 @@ export default function Support() {
                 Do you provide enterprise SLAs?
               </AccordionTrigger>
               <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">
-                Yes! We offer customized Service Level Agreements (SLAs) for enterprise companies requesting dedicated cloud browser clusters, private GitHub proxies, and sub-hour response commitments. Please submit a ticket under the 'Custom Limits' category.
+                Yes! We offer customized Service Level Agreements (SLAs) for enterprise companies requesting dedicated cloud browser clusters, private GitHub proxies, and sub-hour response commitments. Please submit a ticket under the &apos;Custom Limits&apos; category.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

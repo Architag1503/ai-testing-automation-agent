@@ -85,6 +85,7 @@ export default function Pricing() {
       priceMonthly: 0,
       priceAnnually: 0,
       period: "10 days",
+      termMonths: 0,
       features: [
         "1 Repository sync limit",
         "20 test cases generated",
@@ -103,6 +104,7 @@ export default function Pricing() {
       priceMonthly: 29,
       priceAnnually: 23,
       period: "month",
+      termMonths: 3,
       billingText: "Billed every 3 months",
       features: [
         "5 Repositories limit",
@@ -113,7 +115,7 @@ export default function Pricing() {
       ],
       isPopular: false,
       isTrial: false,
-      creditsToGrant: 2500,
+      creditsToGrant: 5000,
     },
     {
       name: "Business 6-Month",
@@ -122,6 +124,7 @@ export default function Pricing() {
       priceMonthly: 49,
       priceAnnually: 39,
       period: "month",
+      termMonths: 6,
       billingText: "Billed every 6 months",
       features: [
         "15 Repositories limit",
@@ -129,11 +132,10 @@ export default function Pricing() {
         "2,000 test runs / month",
         "Browserbase session video replays",
         "CI/CD — GitHub Actions auto-run",
-        "Prioritized AI generation queues",
       ],
       isPopular: true,
       isTrial: false,
-      creditsToGrant: 10000,
+      creditsToGrant: 20000,
     },
     {
       name: "Enterprise 1-Year",
@@ -142,6 +144,7 @@ export default function Pricing() {
       priceMonthly: 79,
       priceAnnually: 63,
       period: "month",
+      termMonths: 12,
       billingText: "Billed annually",
       features: [
         "Unlimited repositories sync",
@@ -149,19 +152,19 @@ export default function Pricing() {
         "10,000 test runs / month",
         "Browserbase session video replays",
         "CI/CD — GitHub Actions auto-run",
-        "Prioritized AI queues",
-        "Dedicated premium support",
       ],
       isPopular: false,
       isTrial: false,
-      creditsToGrant: 50000,
+      creditsToGrant: 100000,
     },
   ]
 
   const getPlanStatus = (planName: string): "active" | "use" | "upgrade" | null => {
     if (planName === "Free Trial") {
       const hasActiveSub = subscriptions?.some((s: any) => s.isActive === 1)
-      return hasActiveSub ? null : "active"
+      if (hasActiveSub) return null
+      if (userDetail?.trialActive === false) return "upgrade"
+      return "active"
     }
     const sub = subscriptions?.find((s: any) => s.planName === planName)
     if (!sub) return "upgrade"
@@ -184,94 +187,26 @@ export default function Pricing() {
     })
 
   const runCheckoutApi = async (plan: any) => {
-    const price = billingPeriod === "monthly" ? plan.priceMonthly : plan.priceAnnually
-
     try {
       const orderRes = await axios.post("/api/checkout/razorpay", {
         planName: plan.name,
-        price,
         billingPeriod,
-        creditsToGrant: plan.creditsToGrant,
       })
-
       setProcessingStep(2)
-
-      if (orderRes.data?.simulation) {
-        await new Promise((r) => setTimeout(r, 1200))
-        setProcessingStep(3)
-
-        const verifyRes = await axios.post("/api/checkout/razorpay/verify", {
-          planName: plan.name,
-          planBadge: plan.badge,
-          creditsToGrant: plan.creditsToGrant,
-          billingPeriod,
-          priceMonthly: plan.priceMonthly,
-          priceAnnually: plan.priceAnnually,
-          razorpay_order_id: orderRes.data?.order?.id || "sim_order_" + Date.now(),
-          razorpay_payment_id: "sim_payment_" + Date.now(),
-          razorpay_signature: "sim_signature",
-          simulation: true,
-        })
-
-        if (verifyRes.data?.success) {
-          setUserDetail(verifyRes.data.user)
-          setSubscriptions(verifyRes.data.subscriptions)
-        }
-        setProcessingStep(4)
-        apiBusy.current = false
-        return
-      }
-
       if (!orderRes.data?.order?.id) {
-        console.error("No order ID returned")
-        setProcessingStep(4)
-        apiBusy.current = false
-        return
+        throw new Error("Payment provider did not return an order")
       }
-
       const rzpKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || ""
-
       if (!rzpKey) {
-        console.warn("NEXT_PUBLIC_RAZORPAY_KEY_ID is not set, falling back to simulation")
-        await new Promise((r) => setTimeout(r, 1200))
-        setProcessingStep(3)
-
-        const verifyRes = await axios.post("/api/checkout/razorpay/verify", {
-          planName: plan.name,
-          planBadge: plan.badge,
-          creditsToGrant: plan.creditsToGrant,
-          billingPeriod,
-          priceMonthly: plan.priceMonthly,
-          priceAnnually: plan.priceAnnually,
-          razorpay_order_id: orderRes.data.order.id,
-          razorpay_payment_id: "sim_payment_" + Date.now(),
-          razorpay_signature: "sim_signature",
-          simulation: true,
-        })
-
-        if (verifyRes.data?.success) {
-          setUserDetail(verifyRes.data.user)
-          setSubscriptions(verifyRes.data.subscriptions)
-        }
-        setProcessingStep(4)
-        apiBusy.current = false
-        return
+        throw new Error("Razorpay public key is not configured")
       }
-
       const scriptLoaded = await loadRazorpayScript()
-      if (!scriptLoaded) {
-        console.error("Failed to load Razorpay SDK")
-        setProcessingStep(4)
-        apiBusy.current = false
-        return
-      }
-
+      if (!scriptLoaded) throw new Error("Could not load Razorpay checkout")
       setIsProcessing(false)
-
       const options = {
         key: rzpKey,
-        amount: price * 100,
-        currency: "INR",
+        amount: orderRes.data.order.amount,
+        currency: orderRes.data.order.currency,
         name: "Testrix",
         description: `${plan.name} Plan`,
         order_id: orderRes.data.order.id,
@@ -280,16 +215,9 @@ export default function Pricing() {
           setProcessingStep(3)
           try {
             const verifyRes = await axios.post("/api/checkout/razorpay/verify", {
-              planName: plan.name,
-              planBadge: plan.badge,
-              creditsToGrant: plan.creditsToGrant,
-              billingPeriod,
-              priceMonthly: plan.priceMonthly,
-              priceAnnually: plan.priceAnnually,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              simulation: false,
             })
             if (verifyRes.data?.success) {
               setUserDetail(verifyRes.data.user)
@@ -297,6 +225,7 @@ export default function Pricing() {
             }
           } catch (err) {
             console.error("Verify failed:", err)
+            window.alert("Payment was received but could not be verified. Contact support with your Razorpay payment ID.")
           }
           setProcessingStep(4)
           apiBusy.current = false
@@ -317,6 +246,7 @@ export default function Pricing() {
       rzp.open()
     } catch (err) {
       console.error("Checkout failed:", err)
+      window.alert((err as any)?.response?.data?.error || (err as Error).message || "Checkout failed")
       setProcessingStep(4)
       setTimeout(() => { setIsProcessing(false); apiBusy.current = false }, 2000)
     }
@@ -355,9 +285,9 @@ export default function Pricing() {
   }
 
   const steps = [
-    { label: "Order Created", detail: `${billingPeriod === "monthly" ? `$${checkoutPlan?.priceMonthly}` : `$${checkoutPlan?.priceAnnually}`} — ${checkoutPlan?.name}` },
+    { label: "Order Created", detail: `₹${(billingPeriod === "monthly" ? checkoutPlan?.priceMonthly * checkoutPlan?.termMonths : checkoutPlan?.priceAnnually * 12) || 0} — ${checkoutPlan?.name}` },
     { label: "Payment Confirmed", detail: "Transaction verified securely" },
-    { label: "Credits Applied", detail: `+${checkoutPlan?.creditsToGrant} credits added` },
+    { label: "Credits Applied", detail: `+${checkoutPlan?.creditsToGrant * (billingPeriod === "monthly" ? checkoutPlan?.termMonths : 12)} credits added` },
   ]
 
   return (
@@ -437,7 +367,7 @@ export default function Pricing() {
                     ) : planStatus === "use" ? (
                       <span className="text-2xl font-bold text-slate-900">Owned</span>
                     ) : (
-                      <><span className="text-4xl font-extrabold text-slate-900">${price}</span><span className="text-slate-500 text-sm font-medium">/ {plan.period}</span></>
+                      <><span className="text-4xl font-extrabold text-slate-900">₹{price}</span><span className="text-slate-500 text-sm font-medium">/ {plan.period}</span></>
                     )}
                   </div>
                   {plan.billingText && !isFree && planStatus !== "active" && planStatus !== "use" && (
@@ -468,6 +398,8 @@ export default function Pricing() {
                     <Button onClick={() => handleUsePlan(plan.name)} className="w-full rounded-xl py-5 font-semibold text-xs transition-transform active:scale-[0.98] bg-white text-emerald-700 border-2 border-emerald-400 hover:bg-emerald-50">
                       Use This Plan
                     </Button>
+                  ) : plan.isTrial ? (
+                    <Button variant="outline" disabled className="w-full rounded-xl py-5 font-semibold text-xs">Trial Ended</Button>
                   ) : (
                     <Button onClick={() => handleCheckout(plan)} className={`w-full rounded-xl py-5 font-semibold text-xs transition-transform active:scale-[0.98] ${
                       plan.isPopular ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/10" : "bg-slate-900 hover:bg-slate-800 text-white"
@@ -491,15 +423,15 @@ export default function Pricing() {
           <Accordion type="single" collapsible className="w-full bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm">
             <AccordionItem value="item-1" className="border-b border-slate-100">
               <AccordionTrigger className="text-slate-800 font-semibold hover:text-emerald-600 text-sm py-4">What are credits used for?</AccordionTrigger>
-              <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">Credits are consumed when Testrix generates or executes automated Playwright test scripts.</AccordionContent>
+      <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">Each generated test case costs 5 credits and each test run costs 5 credits. Monthly generation and execution quotas are enforced separately, alongside your credit balance. AI browser scripts are generated as part of a test run.</AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-2" className="border-b border-slate-100">
               <AccordionTrigger className="text-slate-800 font-semibold hover:text-emerald-600 text-sm py-4">Can I upgrade, downgrade, or switch plans?</AccordionTrigger>
-              <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">Yes! Switch between owned plans anytime by clicking "Use This Plan".</AccordionContent>
+              <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">Yes! Switch between owned plans anytime by selecting &quot;Use This Plan&quot;.</AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-3" className="border-b border-slate-100">
               <AccordionTrigger className="text-slate-800 font-semibold hover:text-emerald-600 text-sm py-4">Is my payment information secure?</AccordionTrigger>
-              <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">All payment processing is handled through Razorpay's PCI-DSS compliant infrastructure.</AccordionContent>
+              <AccordionContent className="text-slate-500 text-xs leading-relaxed pb-4">All payment processing is handled through Razorpay&apos;s PCI-DSS compliant infrastructure.</AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-4" className="border-b-0">
               <AccordionTrigger className="text-slate-800 font-semibold hover:text-emerald-600 text-sm py-4">What is Browserbase session playback?</AccordionTrigger>
@@ -550,7 +482,7 @@ export default function Pricing() {
                   </h2>
                   <p className="text-sm text-slate-500 mt-1">
                     {processingStep === 4
-                      ? `${checkoutPlan?.name} plan is now active with +${checkoutPlan?.creditsToGrant} credits`
+                      ? `${checkoutPlan?.name} plan is now active with +${checkoutPlan?.creditsToGrant * (billingPeriod === "monthly" ? checkoutPlan?.termMonths : 12)} credits`
                       : `Processing your ${checkoutPlan?.name} plan subscription`}
                   </p>
                 </div>

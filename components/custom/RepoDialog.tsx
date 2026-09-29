@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 import {
     Dialog,
@@ -13,7 +13,6 @@ import { Button } from '../ui/button'
 import { DialogClose } from '@radix-ui/react-dialog'
 import axios from 'axios'
 import { Input } from '../ui/input'
-import { UserDetailContext } from '@/context/UserDetailContext'
 
 export type Repo = {
     id: string | number,
@@ -38,21 +37,13 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
     const [searchTerm, setSearchTerm] = useState('');
     const [directRepoInput, setDirectRepoInput] = useState('');
     const [mode, setMode] = useState<'list' | 'direct'>('list');
-    const { userDetail } = useContext(UserDetailContext);
     const [isOpen, setIsOpen] = useState(false);
-
-    useEffect(() => {
-        if (isOpen) {
-            GetRepoList()
-        }
-    }, [isOpen])
 
     const GetRepoList = async () => {
         setLoading(true);
         setError(null);
         try {
-            const url = userDetail?.id ? `/api/github/repos?userId=${userDetail.id}` : '/api/github/repos';
-            const result = await axios.get(url);
+            const result = await axios.get('/api/github/repos');
             console.log("Fetched repos:", result.data);
             setRepoList(result.data)
         } catch (err: any) {
@@ -67,6 +58,10 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
             setLoading(false);
         }
     }
+
+    useEffect(() => {
+        if (isOpen) GetRepoList()
+    }, [isOpen])
 
     const HandleDirectImport = async () => {
         if (!directRepoInput.trim()) return;
@@ -116,7 +111,6 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
             private_: selectedRepo.private_,
             html_url: selectedRepo.html_url,
             description: selectedRepo.description,
-            userId: userDetail?.id,
             owner: selectedRepo.owner,
             language: selectedRepo.language,
             default_branch: selectedRepo.default_branch,

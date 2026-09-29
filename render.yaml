@@ -30,5 +30,17 @@ services:
         sync: false
       - key: BROWSERBASE_API_KEY
         sync: false
+      - key: BROWSERBASE_PROJECT_ID
+        sync: false
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_APP_PRIVATE_KEY
+        sync: false
+      - key: GITHUB_APP_WEBHOOK_SECRET
+        sync: false
+      - key: GITHUB_APP_SETUP_URL
+        sync: false
+      - key: GITHUB_APP_NAME
+        sync: false
     healthCheckPath: /
     autoDeploy: true

@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react'
+import React, { useState } from 'react'
 import { UserRepo } from './WorkspaceBody'
 import {
     Accordion,
@@ -10,7 +10,6 @@ import Image from 'next/image'
 import { Button } from '../ui/button'
 import { CheckCircle2, Globe2Icon, Link2Icon, ListChecks, Loader2, Loader2Icon, Settings2, Sparkles, TrendingUp, XCircle } from 'lucide-react'
 import axios from 'axios'
-import { UserDetailContext } from '@/context/UserDetailContext'
 import TestCaseList from './TestCaseList'
 import RepoSettings from './RepoSettings'
 
@@ -51,7 +50,6 @@ function UserRepoList({ repoList, setReload }: props) {
         passRate: 0,
     });
 
-    const { userDetail } = useContext(UserDetailContext);
     const [loading, setLoading] = useState(false);
     const [testCaseLoading, setTestCaseLoading] = useState(false);
     const [testCases, setTestCases] = useState<TestCase[]>([]);
@@ -60,16 +58,18 @@ function UserRepoList({ repoList, setReload }: props) {
 
         setLoading(true);
 
+        try {
         const result = await axios.post('/api/generate-test-cases', {
-
-            userId: userDetail?.id,
             repoId: repo?.repoId,
             owner: repo.owner,
             repo: repo.name,
             branch: repo.defaultBranch,
         });
 
-        console.log(result.data);
+        await GetTestCases(repo.repoId);
+        } catch (error: any) {
+            window.alert(error.response?.data?.error || "Could not generate test cases");
+        }
         setLoading(false);
     }
 

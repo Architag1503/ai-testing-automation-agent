@@ -21,6 +21,15 @@ export async function POST(req: Request) {
 
     const userId = userResult[0].id;
 
+    const [candidate] = await db.select().from(subscriptions).where(and(
+      eq(subscriptions.id, Number(subscriptionId)),
+      eq(subscriptions.userId, userId),
+      eq(subscriptions.status, "active"),
+    )).limit(1);
+    if (!candidate || (candidate.expiresAt && candidate.expiresAt <= new Date())) {
+      return NextResponse.json({ error: "Subscription is not active or has expired" }, { status: 404 });
+    }
+
     await db
       .update(subscriptions)
       .set({ isActive: 0 })
@@ -29,14 +38,18 @@ export async function POST(req: Request) {
     await db
       .update(subscriptions)
       .set({ isActive: 1 })
-      .where(and(eq(subscriptions.id, subscriptionId), eq(subscriptions.userId, userId)));
+      .where(and(eq(subscriptions.id, candidate.id), eq(subscriptions.userId, userId), eq(subscriptions.status, "active")));
 
     const userSubs = await db
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.userId, userId));
 
-    return NextResponse.json({ success: true, subscriptions: userSubs });
+    const now = new Date();
+    return NextResponse.json({ success: true, subscriptions: userSubs.map((subscription) => ({
+      ...subscription,
+      isActive: subscription.expiresAt && subscription.expiresAt <= now ? 0 : subscription.isActive,
+    })) });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

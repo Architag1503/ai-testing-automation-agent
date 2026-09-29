@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, Type } from "@google/genai";
-import { db, TestCasesTable, users } from "@/db";
+import { db, TestCasesTable } from "@/db";
 import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
-import { currentUser } from "@clerk/nextjs/server";
 import { getInstallationAccessToken } from '@/lib/github-app';
-
-const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY!,
-});
+import { getAuthenticatedAccount } from "@/lib/account";
+import { hasUsageCapacity, refundUsage, reserveUsage } from "@/lib/account-usage";
+import { repositories } from "@/db/schema";
+import { redactSecrets } from "@/lib/redact-secrets";
 
 const ALLOWED_EXTENSIONS = [
     ".js",
@@ -88,7 +86,7 @@ async function getRepoTree({
     }
 
     const res = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
         { headers }
     );
 
@@ -128,7 +126,7 @@ async function readGithubFile({
     }
 
     const res = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`,
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${encodeURIComponent(branch)}`,
         { headers }
     );
 
@@ -153,55 +151,27 @@ async function readGithubFile({
 }
 
 export async function POST(req: NextRequest) {
+    let reservedAccountId: number | undefined;
+    let reservedUnits = 0;
     try {
+        const account = await getAuthenticatedAccount();
+        if (!account) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         const body = await req.json();
-        const cookieStore = await cookies();
-        let installationId = cookieStore.get('gh_installation_id')?.value;
-        const cachedToken = cookieStore.get('gh_app_token')?.value;
-
-        const {
-            userId,
-            repoId,
-            owner,
-            repo,
-            branch = "main",
-        } = body;
-
-        if (!userId || !owner || !repo) {
-            return NextResponse.json(
-                {
-                    error: "userId, owner, and repo are required",
-                },
-                { status: 400 }
-            );
-        }
-
-        if (!installationId) {
-            const clerkUser = await currentUser();
-            const email = clerkUser?.primaryEmailAddress?.emailAddress;
-            if (email) {
-                const [userRecord] = await db.select().from(users).where(eq(users.email, email));
-                installationId = userRecord?.installationId || undefined;
-            }
-        }
-
-        let githubToken = "";
-        if (installationId) {
-            try {
-                githubToken = cachedToken || await getInstallationAccessToken(installationId);
-                if (!cachedToken && githubToken) {
-                    cookieStore.set('gh_app_token', githubToken, {
-                        httpOnly: true,
-                        secure: process.env.NODE_ENV === 'production',
-                        sameSite: 'lax',
-                        maxAge: 60 * 60,
-                        path: '/',
-                    });
-                }
-            } catch (tokenErr) {
-                console.warn("Could not retrieve installation token, attempting unauthenticated fetch for public repo");
-            }
-        }
+        const repoId = Number(body.repoId);
+        if (!Number.isSafeInteger(repoId)) return NextResponse.json({ error: "repoId is required" }, { status: 400 });
+        const [repoRecord] = await db.select().from(repositories)
+            .where(eq(repositories.repoId, repoId)).limit(1);
+        if (!repoRecord || repoRecord.userId !== account.id) return NextResponse.json({ error: "Repository not found" }, { status: 404 });
+        if (!process.env.GEMINI_API_KEY) return NextResponse.json({ error: "AI generation is not configured" }, { status: 503 });
+        const capacity = await hasUsageCapacity(account, "generation");
+        if (!capacity.ok) return NextResponse.json({ error: `Monthly test-case limit reached (${capacity.limit}). Choose a paid plan or wait for the next monthly period.` }, { status: 403 });
+        const maxCases = Math.min(10, capacity.limit - capacity.count, Math.floor(account.credits / 5));
+        if (maxCases < 1) return NextResponse.json({ error: "You need at least 5 credits to generate a test case", credits: account.credits }, { status: 402 });
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const owner = repoRecord.owner;
+        const repo = repoRecord.name;
+        const branch = typeof body.branch === "string" && /^[A-Za-z0-9._/-]{1,100}$/.test(body.branch) ? body.branch : repoRecord.defaultBranch || "main";
+        const githubToken = account.installationId ? await getInstallationAccessToken(account.installationId) : undefined;
 
         // 1. Get repo tree
         const repoFiles = await getRepoTree({
@@ -236,7 +206,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 3. Prepare compact repo context
-        const repoContext = validFiles
+        const repoContext = redactSecrets(validFiles
             .map(
                 (file: any) => `
 File Path: ${file.path}
@@ -245,7 +215,7 @@ File Content:
 ${file.content}
 `
             )
-            .join("\n\n----------------------\n\n");
+            .join("\n\n----------------------\n\n"));
 
         // 4. Ask Gemini to generate test cases with metadata
         const prompt = `
@@ -264,7 +234,7 @@ Branch: ${branch}
 Repository File Context:
 ${repoContext}
 
-Generate 5 to 10 test cases.
+Generate up to ${maxCases} test cases, and never generate more than ${maxCases}.
 
 Each test case must include:
 - title: clear test case title
@@ -293,6 +263,7 @@ Important rules:
                     properties: {
                         testCases: {
                             type: Type.ARRAY,
+                            maxItems: maxCases,
                             items: {
                                 type: Type.OBJECT,
                                 properties: {
@@ -348,7 +319,7 @@ Important rules:
         });
 
         const aiResult = JSON.parse(response.text || "{}");
-        const testCases = aiResult.testCases || [];
+        const testCases = (aiResult.testCases || []).slice(0, maxCases);
 
         if (!testCases.length) {
             return NextResponse.json(
@@ -360,12 +331,22 @@ Important rules:
         }
 
         // 5. Save generated test cases to Neon DB
+        const reservation = await reserveUsage(account, "generation", testCases.length);
+        if (!reservation.ok) {
+            const message = reservation.reason === "credits"
+                ? `Not enough credits. ${reservation.required} credits are needed to generate ${testCases.length} cases.`
+                : `The generation would exceed your monthly limit of ${reservation.limit} test cases.`;
+            return NextResponse.json({ error: message, credits: reservation.reason === "credits" ? reservation.credits : undefined }, { status: 402 });
+        }
+        reservedAccountId = account.id;
+        reservedUnits = testCases.length;
+
         const insertedTestCases = await db
             .insert(TestCasesTable)
             .values(
                 testCases.map((testCase: any) => ({
-                    userId,
-                    repoId,
+                    userId: String(account.id),
+                    repoId: String(repoRecord.repoId),
                     repoName: repo,
                     repoOwner: owner,
                     branch,
@@ -391,6 +372,7 @@ Important rules:
             testCases: insertedTestCases,
         });
     } catch (error: any) {
+        if (reservedAccountId && reservedUnits) await refundUsage(reservedAccountId, "generation", reservedUnits).catch(() => {});
         console.error("Generate test cases error:", error);
 
         return NextResponse.json(

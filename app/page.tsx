@@ -374,7 +374,7 @@ export default function Home() {
               </div>
               <h3 className="text-lg font-bold text-slate-950 mb-2.5">Self-Healing Selectors</h3>
               <p className="text-slate-600 text-sm leading-relaxed">
-                Our code execution uses flexible, resilient fallbacks. If an element's selector changes, the test agent auto-scrolls and uses click-dispatch backups.
+                Our code execution uses flexible, resilient fallbacks. If an element&apos;s selector changes, the test agent auto-scrolls and uses click-dispatch backups.
               </p>
             </motion.div>
 

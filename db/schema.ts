@@ -1,12 +1,15 @@
-import { integer, jsonb, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, serial, text, timestamp, varchar, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   name: text("name"),
   email: text("email").notNull().unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  credits: integer("credits").default(1000).notNull(),
-  installationId: text("installation_id")
+  credits: integer("credits").default(200).notNull(),
+  installationId: text("installation_id"),
+  usageGenerations: integer("usage_generations").default(0).notNull(),
+  usageRuns: integer("usage_runs").default(0).notNull(),
+  usagePeriodStart: timestamp("usage_period_start").defaultNow().notNull(),
 });
 
 export const repositories = pgTable("repositories", {
@@ -26,7 +29,10 @@ export const repositories = pgTable("repositories", {
   testEmail: text("test_email"),
   testPassword: text("test_password"),
   clerkSecretKey: text("clerk_secret_key"),
-});
+  ciApiKey: text("ci_api_key"),
+}, (table) => [
+  uniqueIndex("repositories_ci_api_key_unique").on(table.ciApiKey),
+]);
 
 export const TestCasesTable = pgTable("test_cases", {
   id: serial("id").primaryKey(),
@@ -76,7 +82,9 @@ export const subscriptions = pgTable("subscriptions", {
   status: text("status").default("active").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at"),
-});
+}, (table) => [
+  uniqueIndex("subscriptions_razorpay_payment_id_unique").on(table.razorpayPaymentId),
+]);
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

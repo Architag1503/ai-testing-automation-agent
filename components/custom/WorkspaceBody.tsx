@@ -8,7 +8,6 @@ import EmptyWorkspace from './EmptyWorkspace'
 import axios from 'axios'
 import RepoDialog from './RepoDialog'
 import UserRepoList from './UserRepoList'
-import { useSearchParams } from 'next/navigation'
 
 export type UserRepo = {
     id: number,
@@ -18,16 +17,16 @@ export type UserRepo = {
     private: boolean,
     html_url: string,
     description: string,
-    userId: string,
+    userId: number,
     owner: string,
     updatedAt: string,
     language: string,
     defaultBranch: string
     targetDomain?: string,
     globalInstruction?: string,
-    testEmail?: string,
-    testPassword?: string,
-    clerkSecretKey?: string,
+    hasTestCredentials?: boolean,
+    hasClerkAuth?: boolean,
+    hasCiKey?: boolean,
 }
 
 function WorkspaceBody() {
@@ -35,43 +34,11 @@ function WorkspaceBody() {
     const { userDetail } = useContext(UserDetailContext);
     const [installationId, setInstallationId] = useState<string | null>(null);
     const [userRepoList, setUserRepoList] = useState<UserRepo[]>([]);
-    const searchParams = useSearchParams();
 
-    useEffect(() => {
-        const queryInstId = searchParams?.get('installation_id');
-        if (queryInstId) {
-            setInstallationId(queryInstId);
-            // Save query installation_id to localStorage as backup
-            try { localStorage.setItem('gh_installation_id', queryInstId); } catch (e) {}
-        }
-        CheckGitHubAppInstallation(queryInstId || undefined);
-    }, [searchParams])
-
-    useEffect(() => {
-        userDetail && GetUserAddedRepoList();
-    }, [userDetail])
-
-    const CheckGitHubAppInstallation = async (paramId?: string) => {
+    const CheckGitHubAppInstallation = async () => {
         try {
-            const savedLocalId = typeof window !== 'undefined' ? localStorage.getItem('gh_installation_id') : null;
-            const targetId = paramId || savedLocalId || '';
-
-            if (userDetail?.id && targetId) {
-                try {
-                    await axios.post('/api/user/link-installation', {
-                        userId: userDetail.id,
-                        installationId: targetId
-                    });
-                } catch (linkErr) {
-                    console.log("Could not link installation to user:", linkErr);
-                }
-            }
-
-            const url = targetId ? `/api/github/app/token?installation_id=${targetId}` : '/api/github/app/token';
-            const result = await axios.get(url);
-            if (result.data.token) {
-                setInstallationId('installed');
-            }
+            await axios.get('/api/github/app/token');
+            setInstallationId('installed');
         } catch (err) {
             console.log("No GitHub App installation found");
             setInstallationId(null);
@@ -83,10 +50,12 @@ function WorkspaceBody() {
     }
 
     const GetUserAddedRepoList = async () => {
-        const result = await axios.get('/api/user-repo?userId=' + userDetail?.id);
-        console.log(result.data);
+        const result = await axios.get('/api/user-repo');
         setUserRepoList(result.data);
     }
+
+    useEffect(() => { CheckGitHubAppInstallation(); }, [])
+    useEffect(() => { if (userDetail) GetUserAddedRepoList(); }, [userDetail])
 
     return (
         <div>
