@@ -1,24 +1,47 @@
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getInstallationAccessToken, getInstallationRepos } from '@/lib/github-app';
 import { currentUser } from '@clerk/nextjs/server';
 import { db, users } from '@/db';
 import { eq } from 'drizzle-orm';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const cookieStore = await cookies();
   let installationId = cookieStore.get('gh_installation_id')?.value;
+  let numericUserId: number | undefined = undefined;
   let userEmail: string | undefined = undefined;
 
   try {
-    const clerkUser = await currentUser();
-    userEmail = clerkUser?.primaryEmailAddress?.emailAddress;
+    const userIdParam = req.nextUrl.searchParams.get("userId");
+    if (userIdParam && userIdParam !== "undefined" && userIdParam !== "null") {
+      numericUserId = parseInt(userIdParam);
+    }
 
-    // Fallback: check DB for logged-in user if cookie is missing/cleared
-    if (!installationId && userEmail) {
-      const [userRecord] = await db.select().from(users).where(eq(users.email, userEmail));
-      if (userRecord?.installationId) {
-        installationId = userRecord.installationId;
+    // Attempt DB lookup by userId or email if cookie missing
+    if (!installationId) {
+      if (numericUserId) {
+        const [userRecord] = await db.select().from(users).where(eq(users.id, numericUserId));
+        if (userRecord?.installationId) {
+          installationId = userRecord.installationId;
+        }
+      }
+
+      if (!installationId) {
+        try {
+          const clerkUser = await currentUser();
+          userEmail = clerkUser?.primaryEmailAddress?.emailAddress;
+          if (userEmail) {
+            const [userRecord] = await db.select().from(users).where(eq(users.email, userEmail));
+            if (userRecord?.installationId) {
+              installationId = userRecord.installationId;
+            }
+          }
+        } catch (e) {
+          console.log("Clerk currentUser check omitted or unavailable in GET /api/github/repos");
+        }
+      }
+
+      if (installationId) {
         cookieStore.set('gh_installation_id', installationId, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
@@ -30,7 +53,7 @@ export async function GET() {
     }
 
     if (!installationId) {
-      return NextResponse.json({ error: 'GitHub App not installed. Please install the GitHub App first.' }, { status: 401 });
+      return NextResponse.json({ error: 'GitHub App not installed. Please connect your GitHub App account.' }, { status: 401 });
     }
 
     // Always fetch a fresh token for the installation to avoid stale permissions
@@ -41,8 +64,8 @@ export async function GET() {
       console.warn(`Installation ID ${installationId} is invalid/uninstalled. Clearing stale credentials...`);
       cookieStore.delete('gh_installation_id');
       cookieStore.delete('gh_app_token');
-      if (userEmail) {
-        await db.update(users).set({ installationId: null }).where(eq(users.email, userEmail));
+      if (numericUserId) {
+        await db.update(users).set({ installationId: null }).where(eq(users.id, numericUserId));
       }
       return NextResponse.json({ error: 'GitHub App installation is expired or missing. Please reinstall the GitHub App.' }, { status: 401 });
     }

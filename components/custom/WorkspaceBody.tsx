@@ -55,6 +55,18 @@ function WorkspaceBody() {
         try {
             const savedLocalId = typeof window !== 'undefined' ? localStorage.getItem('gh_installation_id') : null;
             const targetId = paramId || savedLocalId || '';
+
+            if (userDetail?.id && targetId) {
+                try {
+                    await axios.post('/api/user/link-installation', {
+                        userId: userDetail.id,
+                        installationId: targetId
+                    });
+                } catch (linkErr) {
+                    console.log("Could not link installation to user:", linkErr);
+                }
+            }
+
             const url = targetId ? `/api/github/app/token?installation_id=${targetId}` : '/api/github/app/token';
             const result = await axios.get(url);
             if (result.data.token) {

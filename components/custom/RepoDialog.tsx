@@ -51,7 +51,8 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
         setLoading(true);
         setError(null);
         try {
-            const result = await axios.get('/api/github/repos')
+            const url = userDetail?.id ? `/api/github/repos?userId=${userDetail.id}` : '/api/github/repos';
+            const result = await axios.get(url);
             console.log("Fetched repos:", result.data);
             setRepoList(result.data)
         } catch (err: any) {
