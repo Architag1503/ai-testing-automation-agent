@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, Type } from "@google/genai";
-import { db, TestCasesTable } from "@/db";
+import { db, TestCasesTable, users } from "@/db";
+import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { currentUser } from "@clerk/nextjs/server";
 import { getInstallationAccessToken } from '@/lib/github-app';
 
 const ai = new GoogleGenAI({
@@ -75,17 +77,19 @@ async function getRepoTree({
     owner: string;
     repo: string;
     branch: string;
-    githubToken: string;
+    githubToken?: string;
 }) {
+    const headers: Record<string, string> = {
+        Accept: "application/vnd.github+json",
+        "User-Agent": "ai-test-automation-agent",
+    };
+    if (githubToken) {
+        headers["Authorization"] = `Bearer ${githubToken}`;
+    }
+
     const res = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
-        {
-            headers: {
-                Authorization: `Bearer ${githubToken}`,
-                Accept: "application/vnd.github+json",
-                "User-Agent": "ai-test-automation-agent",
-            },
-        }
+        { headers }
     );
 
     if (!res.ok) {
@@ -96,7 +100,7 @@ async function getRepoTree({
 
     const data = await res.json();
 
-    return data.tree
+    return (data.tree || [])
         .filter((item: any) => item.type === "blob")
         .filter((item: any) => isUsefulFile(item.path))
         .slice(0, 25);
@@ -113,17 +117,19 @@ async function readGithubFile({
     repo: string;
     path: string;
     branch: string;
-    githubToken: string;
+    githubToken?: string;
 }) {
+    const headers: Record<string, string> = {
+        Accept: "application/vnd.github+json",
+        "User-Agent": "ai-test-automation-agent",
+    };
+    if (githubToken) {
+        headers["Authorization"] = `Bearer ${githubToken}`;
+    }
+
     const res = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`,
-        {
-            headers: {
-                Authorization: `Bearer ${githubToken}`,
-                Accept: "application/vnd.github+json",
-                "User-Agent": "ai-test-automation-agent",
-            },
-        }
+        { headers }
     );
 
     if (!res.ok) {
@@ -150,7 +156,7 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
         const cookieStore = await cookies();
-        const installationId = cookieStore.get('gh_installation_id')?.value;
+        let installationId = cookieStore.get('gh_installation_id')?.value;
         const cachedToken = cookieStore.get('gh_app_token')?.value;
 
         const {
@@ -161,25 +167,40 @@ export async function POST(req: NextRequest) {
             branch = "main",
         } = body;
 
-        if (!userId || !owner || !repo || !installationId) {
+        if (!userId || !owner || !repo) {
             return NextResponse.json(
                 {
-                    error: "userId, owner, repo and GitHub App installation are required",
+                    error: "userId, owner, and repo are required",
                 },
                 { status: 400 }
             );
         }
 
-        const githubToken = cachedToken || await getInstallationAccessToken(installationId);
+        if (!installationId) {
+            const clerkUser = await currentUser();
+            const email = clerkUser?.primaryEmailAddress?.emailAddress;
+            if (email) {
+                const [userRecord] = await db.select().from(users).where(eq(users.email, email));
+                installationId = userRecord?.installationId || undefined;
+            }
+        }
 
-        if (!cachedToken) {
-            cookieStore.set('gh_app_token', githubToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                maxAge: 60 * 60,
-                path: '/',
-            });
+        let githubToken = "";
+        if (installationId) {
+            try {
+                githubToken = cachedToken || await getInstallationAccessToken(installationId);
+                if (!cachedToken && githubToken) {
+                    cookieStore.set('gh_app_token', githubToken, {
+                        httpOnly: true,
+                        secure: process.env.NODE_ENV === 'production',
+                        sameSite: 'lax',
+                        maxAge: 60 * 60,
+                        path: '/',
+                    });
+                }
+            } catch (tokenErr) {
+                console.warn("Could not retrieve installation token, attempting unauthenticated fetch for public repo");
+            }
         }
 
         // 1. Get repo tree
