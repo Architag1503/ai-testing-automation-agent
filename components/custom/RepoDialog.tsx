@@ -50,11 +50,11 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
             setRepoList(result.data)
         } catch (err: any) {
             console.error("Failed to fetch repositories:", err);
+            const serverError = err.response?.data?.error;
             if (err.response?.status === 401) {
-                setError("GitHub App connection needs refresh.");
+                setError(serverError || "GitHub App is not connected yet. Click 'Install GitHub App' to connect.");
             } else {
-                const errMsg = err.response?.data?.error || err.message || "Failed to load GitHub repositories.";
-                setError(errMsg);
+                setError(serverError || "Could not load GitHub App repositories. Click 'Install GitHub App' to connect or import by repository name.");
             }
         } finally {
             setLoading(false);
@@ -168,7 +168,7 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
                             </p>
                             <div className="flex gap-2">
                                 <Input 
-                                    placeholder="e.g. Hardik180704/my-awesome-project"
+                                    placeholder="e.g. Architag1503/ai-testing-automation-agent"
                                     value={directRepoInput}
                                     onChange={(e) => setDirectRepoInput(e.target.value)}
                                     disabled={importLoading}
@@ -205,9 +205,9 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
                             {error && (
                                 <div className="p-4 border border-red-200 bg-red-50 text-red-700 rounded-xl flex flex-col gap-3">
                                     <div className="flex flex-col gap-1">
-                                        <p className="font-semibold text-sm">Error: {error}</p>
+                                        <p className="font-semibold text-sm">{error}</p>
                                         <p className="text-xs text-red-600">
-                                            Re-install the GitHub App or import your repository directly by name.
+                                            Click below to install the GitHub App for repository access, or import a repository directly by name.
                                         </p>
                                     </div>
                                     <div className="flex gap-2">
@@ -217,7 +217,7 @@ function RepoDialog({ setRefreshPage }: { setRefreshPage: (refresh: boolean) => 
                                             className="text-blue-700 border-blue-300 bg-white hover:bg-blue-50"
                                             onClick={() => window.location.href = '/api/github/app'}
                                         >
-                                            Reinstall GitHub App
+                                            Install GitHub App
                                         </Button>
                                         <Button 
                                             variant="outline" 
