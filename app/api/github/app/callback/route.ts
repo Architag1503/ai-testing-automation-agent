@@ -6,13 +6,20 @@ import { eq } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   const baseUrl = req.nextUrl.origin;
-  const account = await getAuthenticatedAccount();
+  let account;
+  try {
+    account = await getAuthenticatedAccount();
+  } catch (error) {
+    console.error("Account resolution failed during GitHub App callback", error);
+    return NextResponse.redirect(new URL("/sign-in?redirect_url=/workspace", baseUrl));
+  }
   if (!account) return NextResponse.redirect(new URL("/sign-in?redirect_url=/workspace", baseUrl));
 
   const suppliedState = req.nextUrl.searchParams.get("state");
   const expectedState = req.cookies.get("github_install_state")?.value;
   const installationId = req.nextUrl.searchParams.get("installation_id");
   const setupAction = req.nextUrl.searchParams.get("setup_action");
+
   if (!suppliedState || !expectedState || suppliedState !== expectedState || !installationId || !/^\d+$/.test(installationId) || !["install", "update"].includes(setupAction || "")) {
     return NextResponse.redirect(new URL("/workspace?githubError=invalid_callback", baseUrl));
   }
@@ -26,7 +33,7 @@ export async function GET(req: NextRequest) {
     response.cookies.delete("gh_app_token");
     return response;
   } catch (error) {
-    console.error("GitHub App callback failed", error);
+    console.error("GitHub App callback verification failed", error);
     return NextResponse.redirect(new URL("/workspace?githubError=installation_failed", baseUrl));
   }
 }

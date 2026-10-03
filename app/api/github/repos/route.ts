@@ -3,14 +3,20 @@ import { getAuthenticatedAccount } from "@/lib/account";
 import { getInstallationAccessToken, getInstallationRepos } from "@/lib/github-app";
 
 export async function GET() {
-  const account = await getAuthenticatedAccount();
-  if (!account) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!account.installationId) return NextResponse.json({ error: "Install the Testrix GitHub App first" }, { status: 401 });
   try {
+    const account = await getAuthenticatedAccount();
+    if (!account) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!account.installationId) return NextResponse.json({ error: "Install the Testrix GitHub App first" }, { status: 401 });
+
     const token = await getInstallationAccessToken(account.installationId);
-    return NextResponse.json(await getInstallationRepos(account.installationId, token));
-  } catch (error) {
+    const repos = await getInstallationRepos(account.installationId, token);
+    return NextResponse.json(repos);
+  } catch (error: any) {
     console.error("GitHub repository fetch failed", error);
-    return NextResponse.json({ error: "Could not load repositories from GitHub" }, { status: 502 });
+    const status = typeof error?.status === "number" ? error.status : 502;
+    return NextResponse.json(
+      { error: error?.message || "Could not load repositories from GitHub" },
+      { status: status >= 400 && status < 600 ? status : 502 }
+    );
   }
 }

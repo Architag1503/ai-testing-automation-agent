@@ -1,21 +1,35 @@
 import { SignJWT } from 'jose';
 import { createPrivateKey } from 'node:crypto';
 
+export function normalizePrivateKey(key: string): string {
+  let trimmed = key.trim();
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    trimmed = trimmed.slice(1, -1).trim();
+  }
+  return trimmed
+    .split(/\r?\n|\\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
 export async function generateGitHubAppJWT(): Promise<string> {
   const appId = process.env.GITHUB_APP_ID;
-  const privateKey = process.env.GITHUB_APP_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const rawPrivateKey = process.env.GITHUB_APP_PRIVATE_KEY;
 
-  if (!appId || !privateKey) {
+  if (!appId || !rawPrivateKey) {
     throw new Error('GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY must be set');
   }
 
+  const privateKey = normalizePrivateKey(rawPrivateKey);
+
   // Node parses both GitHub's traditional PKCS#1 PEM (RSA PRIVATE KEY)
-  // and PKCS#8 PEM (PRIVATE KEY). WebCrypto's pkcs8 import rejected the
-  // PKCS#1 format shown in the deployment environment example.
+  // and PKCS#8 PEM (PRIVATE KEY).
   let key: ReturnType<typeof createPrivateKey>;
   try {
     key = createPrivateKey(privateKey);
-  } catch {
+  } catch (error: any) {
+    console.error('Failed to parse GITHUB_APP_PRIVATE_KEY', error);
     throw new Error('GITHUB_APP_PRIVATE_KEY is not a valid PEM private key');
   }
   if (key.asymmetricKeyType !== 'rsa') {
@@ -109,11 +123,11 @@ export async function getInstallationRepos(installationId: string, token: string
     id: r.id,
     name: r.name,
     full_name: r.full_name,
-    private_: r.private,
+    private_: Boolean(r.private),
     html_url: r.html_url,
-    description: r.description,
-    language: r.language,
-    default_branch: r.default_branch,
+    description: r.description || '',
+    language: r.language || '',
+    default_branch: r.default_branch || 'main',
     owner: r.owner?.login || '',
   }));
 }

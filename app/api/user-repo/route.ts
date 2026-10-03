@@ -6,31 +6,36 @@ import { getGitHubRepository, GitHubRepositoryError } from "@/lib/github-reposit
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET() {
-  const account = await getAuthenticatedAccount();
-  if (!account) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const rows = await db.select({
-    id: repositories.id, repoId: repositories.repoId, name: repositories.name,
-    full_name: repositories.full_name, private: repositories.private,
-    html_url: repositories.html_url, description: repositories.description,
-    owner: repositories.owner, language: repositories.language,
-    defaultBranch: repositories.defaultBranch, targetDomain: repositories.targetDomain,
-    globalInstruction: repositories.globalInstruction,
-    configuredTestCredentials: repositories.testEmail,
-    configuredClerkAuth: repositories.clerkSecretKey,
-    configuredCiKey: repositories.ciApiKey,
-  }).from(repositories).where(eq(repositories.userId, account.id));
-  return NextResponse.json(rows.map(({ configuredTestCredentials, configuredClerkAuth, configuredCiKey, ...repo }) => ({
-    ...repo,
-    hasTestCredentials: Boolean(configuredTestCredentials),
-    hasClerkAuth: Boolean(configuredClerkAuth),
-    hasCiKey: Boolean(configuredCiKey),
-  })));
+  try {
+    const account = await getAuthenticatedAccount();
+    if (!account) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const rows = await db.select({
+      id: repositories.id, repoId: repositories.repoId, name: repositories.name,
+      full_name: repositories.full_name, private: repositories.private,
+      html_url: repositories.html_url, description: repositories.description,
+      owner: repositories.owner, language: repositories.language,
+      defaultBranch: repositories.defaultBranch, targetDomain: repositories.targetDomain,
+      globalInstruction: repositories.globalInstruction,
+      configuredTestCredentials: repositories.testEmail,
+      configuredClerkAuth: repositories.clerkSecretKey,
+      configuredCiKey: repositories.ciApiKey,
+    }).from(repositories).where(eq(repositories.userId, account.id));
+    return NextResponse.json(rows.map(({ configuredTestCredentials, configuredClerkAuth, configuredCiKey, ...repo }) => ({
+      ...repo,
+      hasTestCredentials: Boolean(configuredTestCredentials),
+      hasClerkAuth: Boolean(configuredClerkAuth),
+      hasCiKey: Boolean(configuredCiKey),
+    })));
+  } catch (error) {
+    console.error("Failed to fetch user repositories", error);
+    return NextResponse.json({ error: "Could not load saved repositories" }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
-  const account = await getAuthenticatedAccount();
-  if (!account) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
+    const account = await getAuthenticatedAccount();
+    if (!account) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const body = await req.json();
     const repoId = Number(body.repoId);
     const fullName = String(body.full_name || "");
