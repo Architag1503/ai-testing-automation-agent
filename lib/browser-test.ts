@@ -23,7 +23,18 @@ function validatePlan(value: unknown): TestPlan {
       if (item !== undefined && (typeof item !== "string" || item.length > 1000)) throw new Error("Test plan contains an invalid or oversized value");
     }
     if (step.target && (!step.target.value || !["role", "label", "placeholder", "text", "css"].includes(step.target.by))) throw new Error("Test plan contains an invalid locator");
-      if (step.action === "navigate" && (!step.route || !step.route.startsWith("/") || step.route.startsWith("//") || step.route.includes("\\"))) throw new Error("Navigation actions must use an application-relative route");
+    if (step.action === "navigate") {
+      if (step.route && (step.route.startsWith("http://") || step.route.startsWith("https://"))) {
+        try {
+          const parsed = new URL(step.route);
+          step.route = parsed.pathname + parsed.search + parsed.hash;
+        } catch {}
+      }
+      if (step.route && !step.route.startsWith("/")) {
+        step.route = "/" + step.route;
+      }
+      if (!step.route || !step.route.startsWith("/") || step.route.startsWith("//") || step.route.includes("\\")) throw new Error("Navigation actions must use an application-relative route");
+    }
     if (["click", "fill", "check", "uncheck", "selectOption", "assertVisible"].includes(step.action) && !step.target) throw new Error(`${step.action} requires a locator`);
     if (step.action === "fill" && step.value === undefined) throw new Error("fill requires a value");
     if (["assertText", "assertUrlContains"].includes(step.action) && !step.text) throw new Error(`${step.action} requires text`);
@@ -131,9 +142,11 @@ export async function runBrowserTest(input: {
   let browser: any;
   const scriptText = JSON.stringify(plan, null, 2);
   try {
-    if (!process.env.BROWSERBASE_API_KEY || !process.env.BROWSERBASE_PROJECT_ID) throw new Error("Browserbase is not configured");
-    const bb = new Browserbase({ apiKey: process.env.BROWSERBASE_API_KEY });
-    session = await bb.sessions.create({ projectId: process.env.BROWSERBASE_PROJECT_ID });
+    const bbApiKey = (process.env.BROWSERBASE_API_KEY || "").trim();
+    const bbProjectId = (process.env.BROWSERBASE_PROJECT_ID || "").trim();
+    if (!bbApiKey || !bbProjectId) throw new Error("Browserbase is not configured");
+    const bb = new Browserbase({ apiKey: bbApiKey });
+    session = await bb.sessions.create({ projectId: bbProjectId });
     browser = await chromium.connectOverCDP(session.connectUrl);
     const context = browser.contexts()[0];
     const page = context.pages()[0] || await context.newPage();

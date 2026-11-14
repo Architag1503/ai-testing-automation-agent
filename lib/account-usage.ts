@@ -16,7 +16,14 @@ export async function getAccountPlan(account: User): Promise<AccountPlan> {
   }
   const trial = PLAN_CATALOG["Free Trial"];
   const trialExpired = account.createdAt.getTime() + 10 * 24 * 60 * 60 * 1000 <= Date.now();
-  return { name: "Free Trial", ...trial, generations: trialExpired ? 0 : trial.generations, runs: trialExpired ? 0 : trial.runs, activeSubscription: null };
+  const hasCredits = (account.credits ?? 0) > 0;
+  return {
+    name: "Free Trial",
+    ...trial,
+    generations: trialExpired && !hasCredits ? 0 : trial.generations,
+    runs: trialExpired && !hasCredits ? 0 : trial.runs,
+    activeSubscription: null,
+  };
 }
 
 export async function reserveUsage(account: User, kind: "generation" | "run", units = 1) {
