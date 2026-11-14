@@ -17,10 +17,51 @@ export async function GET(req: NextRequest) {
 
   const suppliedState = req.nextUrl.searchParams.get("state");
   const expectedState = req.cookies.get("github_install_state")?.value;
-  const installationId = req.nextUrl.searchParams.get("installation_id");
-  const setupAction = req.nextUrl.searchParams.get("setup_action");
+  let installationId = req.nextUrl.searchParams.get("installation_id");
+  const code = req.nextUrl.searchParams.get("code");
 
-  if (!suppliedState || !expectedState || suppliedState !== expectedState || !installationId || !/^\d+$/.test(installationId) || !["install", "update"].includes(setupAction || "")) {
+  // If state was provided both in query and cookie, ensure they match to prevent CSRF.
+  if (suppliedState && expectedState && suppliedState !== expectedState) {
+    console.warn("Mismatched state on GitHub callback");
+    return NextResponse.redirect(new URL("/workspace?githubError=invalid_callback", baseUrl));
+  }
+
+  // If installation_id was not in the query but OAuth code was returned, exchange code to get the user's installation
+  if (!installationId && code && process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+    try {
+      const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          client_id: process.env.GITHUB_CLIENT_ID,
+          client_secret: process.env.GITHUB_CLIENT_SECRET,
+          code,
+        }),
+      });
+      const tokenData = await tokenRes.json();
+      if (tokenData.access_token) {
+        const userInstRes = await fetch("https://api.github.com/user/installations", {
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+            Accept: "application/vnd.github.v3+json",
+            "User-Agent": "ai-test-automation-agent",
+          },
+        });
+        const userInstData = await userInstRes.json();
+        const userInst = userInstData.installations?.[0];
+        if (userInst?.id) {
+          installationId = String(userInst.id);
+        }
+      }
+    } catch (codeErr) {
+      console.warn("Failed to exchange OAuth code for user installation:", codeErr);
+    }
+  }
+
+  if (!installationId || !/^\d+$/.test(installationId)) {
     return NextResponse.redirect(new URL("/workspace?githubError=invalid_callback", baseUrl));
   }
 

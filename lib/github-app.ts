@@ -37,14 +37,68 @@ export async function generateGitHubAppJWT(): Promise<string> {
   }
 
   const now = Math.floor(Date.now() / 1000);
+  // Backdate issued-at by 60 seconds to tolerate clock drift between servers and GitHub.
+  // Expire in 9 minutes (well within GitHub's strict 10-minute maximum limit).
   const jwt = await new SignJWT({})
     .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
-    .setIssuedAt(now)
-    .setExpirationTime(now + 600)
+    .setIssuedAt(now - 60)
+    .setExpirationTime(now + 540)
     .setIssuer(appId)
     .sign(key);
 
   return jwt;
+}
+
+export async function getAppInstallations(): Promise<any[]> {
+  const jwt = await generateGitHubAppJWT();
+  const res = await fetch(`https://api.github.com/app/installations?per_page=100`, {
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      Accept: 'application/vnd.github.v3+json',
+      'User-Agent': 'ai-test-automation-agent',
+    },
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '');
+    console.error(`Failed to fetch app installations: ${res.status} ${errorText}`);
+    return [];
+  }
+
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+export async function findInstallationForUser(
+  githubUsername?: string | null,
+  email?: string | null
+): Promise<string | null> {
+  try {
+    const installations = await getAppInstallations();
+    if (!installations.length) return null;
+
+    if (githubUsername) {
+      const match = installations.find(
+        (i: any) => i.account?.login?.toLowerCase() === githubUsername.trim().toLowerCase()
+      );
+      if (match) return String(match.id);
+    }
+
+    if (email) {
+      const prefix = email.split('@')[0]?.trim().toLowerCase();
+      if (prefix) {
+        const match = installations.find(
+          (i: any) => i.account?.login?.toLowerCase() === prefix
+        );
+        if (match) return String(match.id);
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error finding installation for user:', error);
+    return null;
+  }
 }
 
 export async function getInstallationAccessToken(installationId: string): Promise<string> {

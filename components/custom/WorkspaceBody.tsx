@@ -57,7 +57,13 @@ function WorkspaceBody() {
 
     useEffect(() => {
         CheckGitHubAppInstallation();
-        const reason = new URLSearchParams(window.location.search).get('githubError');
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('github') === 'connected') {
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('github');
+            window.history.replaceState({}, '', cleanUrl);
+        }
+        const reason = params.get('githubError');
         const messages: Record<string, string> = {
             not_configured: 'GitHub App setup is incomplete. Set GITHUB_APP_NAME to the app slug, and configure GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY in Render and Vercel.',
             credentials_invalid: 'The GitHub App credentials are invalid. Verify GITHUB_APP_ID and upload the matching RSA private key in Render and Vercel.',

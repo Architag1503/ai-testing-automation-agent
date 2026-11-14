@@ -24,3 +24,17 @@ export async function getAuthenticatedAccount(): Promise<User | null> {
     throw new Error("Could not initialize the application account");
   }
 }
+
+/** Extract the GitHub username if the user signed in with GitHub OAuth in Clerk. */
+export async function getAuthenticatedClerkGitHubUsername(): Promise<string | null> {
+  try {
+    const clerkUser = await currentUser();
+    if (!clerkUser) return null;
+    const gh = clerkUser.externalAccounts?.find(
+      (acc: any) => acc.provider === "oauth_github"
+    );
+    return gh?.username || null;
+  } catch {
+    return null;
+  }
+}

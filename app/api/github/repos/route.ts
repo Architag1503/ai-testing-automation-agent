@@ -1,15 +1,32 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedAccount } from "@/lib/account";
-import { getInstallationAccessToken, getInstallationRepos } from "@/lib/github-app";
+import { getAuthenticatedAccount, getAuthenticatedClerkGitHubUsername } from "@/lib/account";
+import { findInstallationForUser, getInstallationAccessToken, getInstallationRepos } from "@/lib/github-app";
+import { db, users } from "@/db";
+import { eq } from "drizzle-orm";
 
 export async function GET() {
   try {
     const account = await getAuthenticatedAccount();
     if (!account) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (!account.installationId) return NextResponse.json({ error: "Install the Testrix GitHub App first" }, { status: 401 });
 
-    const token = await getInstallationAccessToken(account.installationId);
-    const repos = await getInstallationRepos(account.installationId, token);
+    let installationId = account.installationId;
+
+    // If user has no installationId in DB, attempt to auto-link an existing GitHub App installation
+    if (!installationId) {
+      const githubUsername = await getAuthenticatedClerkGitHubUsername();
+      const detectedId = await findInstallationForUser(githubUsername, account.email);
+      if (detectedId) {
+        await db.update(users).set({ installationId: detectedId }).where(eq(users.id, account.id));
+        installationId = detectedId;
+      }
+    }
+
+    if (!installationId) {
+      return NextResponse.json({ error: "Install the Testrix GitHub App first" }, { status: 401 });
+    }
+
+    const token = await getInstallationAccessToken(installationId);
+    const repos = await getInstallationRepos(installationId, token);
     return NextResponse.json(repos);
   } catch (error: any) {
     console.error("GitHub repository fetch failed", error);
