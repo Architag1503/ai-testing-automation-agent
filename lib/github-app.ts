@@ -1,4 +1,4 @@
-import { SignJWT } from 'jose';
+import { SignJWT, importPKCS8 } from 'jose';
 import { createPrivateKey } from 'node:crypto';
 
 export function normalizePrivateKey(key: string): string {
@@ -24,17 +24,20 @@ export async function generateGitHubAppJWT(): Promise<string> {
 
   const privateKey = normalizePrivateKey(rawPrivateKey);
 
-  // Node parses both GitHub's traditional PKCS#1 PEM (RSA PRIVATE KEY)
-  // and PKCS#8 PEM (PRIVATE KEY).
-  let key: ReturnType<typeof createPrivateKey>;
+  let key: any;
   try {
-    key = createPrivateKey(privateKey);
-  } catch (error: any) {
-    console.error('Failed to parse GITHUB_APP_PRIVATE_KEY', error);
-    throw new Error('GITHUB_APP_PRIVATE_KEY is not a valid PEM private key');
-  }
-  if (key.asymmetricKeyType !== 'rsa') {
-    throw new Error('GITHUB_APP_PRIVATE_KEY must be an RSA private key');
+    key = await importPKCS8(privateKey, 'RS256');
+  } catch {
+    try {
+      const nodeKey = createPrivateKey(privateKey);
+      if (nodeKey.asymmetricKeyType !== 'rsa') {
+        throw new Error('GITHUB_APP_PRIVATE_KEY must be an RSA private key');
+      }
+      key = nodeKey;
+    } catch (error: any) {
+      console.error('Failed to parse GITHUB_APP_PRIVATE_KEY', error);
+      throw new Error('GITHUB_APP_PRIVATE_KEY is not a valid PEM private key');
+    }
   }
 
   const now = Math.floor(Date.now() / 1000);

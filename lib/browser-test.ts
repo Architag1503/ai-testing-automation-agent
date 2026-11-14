@@ -1,6 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Browserbase } from "@browserbasehq/sdk";
-import { chromium } from "playwright-core";
 import { db, TestCasesTable, repositories, type User } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { getInstallationAccessToken } from "@/lib/github-app";
@@ -195,6 +194,7 @@ export async function runBrowserTest(input: {
     if (!bbApiKey || !bbProjectId) throw new Error("Browserbase is not configured. Set BROWSERBASE_API_KEY and BROWSERBASE_PROJECT_ID in environment variables.");
     const bb = new Browserbase({ apiKey: bbApiKey });
     session = await bb.sessions.create({ projectId: bbProjectId });
+    const { chromium } = await import("playwright-core");
     browser = await chromium.connectOverCDP(session.connectUrl);
     const context = browser.contexts()[0];
     const page = context.pages()[0] || await context.newPage();
