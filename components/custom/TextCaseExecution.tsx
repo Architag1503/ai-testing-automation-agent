@@ -150,7 +150,12 @@ export default function TestExecutionModal({ isOpen, onClose, testCases, reposit
                     },
                 }));
             } catch (err: any) {
-                const errMsg = err.response?.data?.error || err.message || "Execution failed";
+                const data = err.response?.data;
+                const errMsg = (typeof data === "object" && data?.error)
+                    ? data.error
+                    : (typeof data === "string" && data.length < 300)
+                    ? data
+                    : err.message || "Execution failed";
                 setResults((prev) => ({
                     ...prev,
                     [tcId]: {

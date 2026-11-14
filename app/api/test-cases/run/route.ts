@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedAccount } from "@/lib/account";
 import { getOwnedTestCase, runBrowserTest } from "@/lib/browser-test";
 
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   const account = await getAuthenticatedAccount();
   if (!account) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

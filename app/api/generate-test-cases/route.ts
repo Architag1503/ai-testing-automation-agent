@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, Type } from "@google/genai";
+
+export const maxDuration = 60;
 import { db, TestCasesTable } from "@/db";
 import { eq } from "drizzle-orm";
 import { getInstallationAccessToken } from '@/lib/github-app';
@@ -253,70 +255,139 @@ Important rules:
 - Return only valid JSON.
 `;
 
-        const response = await ai.models.generateContent({
-            model: "gemini-3.1-flash-lite",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        testCases: {
-                            type: Type.ARRAY,
-                            maxItems: maxCases,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    title: {
-                                        type: Type.STRING,
-                                    },
-                                    description: {
-                                        type: Type.STRING,
-                                    },
-                                    type: {
-                                        type: Type.STRING,
-                                        enum: [
-                                            "ui",
-                                            "auth",
-                                            "api",
-                                            "form",
-                                            "integration",
-                                            "edge-case",
-                                        ],
-                                    },
-                                    priority: {
-                                        type: Type.STRING,
-                                        enum: ["low", "medium", "high"],
-                                    },
-                                    targetRoute: {
-                                        type: Type.STRING,
-                                    },
-                                    targetFiles: {
-                                        type: Type.ARRAY,
-                                        items: {
+        let response;
+        try {
+            response = await ai.models.generateContent({
+                model: "gemini-3.5-flash-lite",
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            testCases: {
+                                type: Type.ARRAY,
+                                maxItems: maxCases,
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        title: {
+                                            type: Type.STRING,
+                                        },
+                                        description: {
+                                            type: Type.STRING,
+                                        },
+                                        type: {
+                                            type: Type.STRING,
+                                            enum: [
+                                                "ui",
+                                                "auth",
+                                                "api",
+                                                "form",
+                                                "integration",
+                                                "edge-case",
+                                            ],
+                                        },
+                                        priority: {
+                                            type: Type.STRING,
+                                            enum: ["low", "medium", "high"],
+                                        },
+                                        targetRoute: {
+                                            type: Type.STRING,
+                                        },
+                                        targetFiles: {
+                                            type: Type.ARRAY,
+                                            items: {
+                                                type: Type.STRING,
+                                            },
+                                        },
+                                        expectedResult: {
                                             type: Type.STRING,
                                         },
                                     },
-                                    expectedResult: {
-                                        type: Type.STRING,
-                                    },
+                                    required: [
+                                        "title",
+                                        "description",
+                                        "type",
+                                        "priority",
+                                        "targetRoute",
+                                        "targetFiles",
+                                        "expectedResult",
+                                    ],
                                 },
-                                required: [
-                                    "title",
-                                    "description",
-                                    "type",
-                                    "priority",
-                                    "targetRoute",
-                                    "targetFiles",
-                                    "expectedResult",
-                                ],
                             },
                         },
+                        required: ["testCases"],
                     },
-                    required: ["testCases"],
                 },
-            },
-        });
+            });
+        } catch (err: any) {
+            console.warn("gemini-3.5-flash-lite failed, falling back to gemini-3.1-flash-lite:", err?.message || err);
+            response = await ai.models.generateContent({
+                model: "gemini-3.1-flash-lite",
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            testCases: {
+                                type: Type.ARRAY,
+                                maxItems: maxCases,
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        title: {
+                                            type: Type.STRING,
+                                        },
+                                        description: {
+                                            type: Type.STRING,
+                                        },
+                                        type: {
+                                            type: Type.STRING,
+                                            enum: [
+                                                "ui",
+                                                "auth",
+                                                "api",
+                                                "form",
+                                                "integration",
+                                                "edge-case",
+                                            ],
+                                        },
+                                        priority: {
+                                            type: Type.STRING,
+                                            enum: ["low", "medium", "high"],
+                                        },
+                                        targetRoute: {
+                                            type: Type.STRING,
+                                        },
+                                        targetFiles: {
+                                            type: Type.ARRAY,
+                                            items: {
+                                                type: Type.STRING,
+                                            },
+                                        },
+                                        expectedResult: {
+                                            type: Type.STRING,
+                                        },
+                                    },
+                                    required: [
+                                        "title",
+                                        "description",
+                                        "type",
+                                        "priority",
+                                        "targetRoute",
+                                        "targetFiles",
+                                        "expectedResult",
+                                    ],
+                                },
+                            },
+                        },
+                        required: ["testCases"],
+                    },
+                },
+            });
+        }
 
         const aiResult = JSON.parse(response.text || "{}");
         const testCases = (aiResult.testCases || []).slice(0, maxCases);

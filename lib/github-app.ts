@@ -2,13 +2,14 @@ import { SignJWT } from 'jose';
 import { createPrivateKey } from 'node:crypto';
 
 export function normalizePrivateKey(key: string): string {
-  let trimmed = key.trim();
-  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
-    trimmed = trimmed.slice(1, -1).trim();
+  let trimmed = key.trim().replace(/^["'\\]+|["'\\]+$/g, '').trim();
+  const pemMatch = trimmed.match(/-----BEGIN[ A-Z0-9_-]+PRIVATE KEY-----[\s\S]*?-----END[ A-Z0-9_-]+PRIVATE KEY-----/);
+  if (pemMatch) {
+    trimmed = pemMatch[0];
   }
   return trimmed
     .split(/\r?\n|\\n/)
-    .map((line) => line.trim())
+    .map((line) => line.trim().replace(/^["']+|["']+$/g, ''))
     .filter(Boolean)
     .join('\n');
 }

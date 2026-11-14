@@ -5,6 +5,8 @@ import { and, eq } from "drizzle-orm";
 import { getAccountPlan } from "@/lib/account-usage";
 import { runBrowserTest } from "@/lib/browser-test";
 
+export const maxDuration = 60;
+
 async function githubRequest(url: string, token: string, init?: RequestInit) {
   return fetch(url, { ...init, headers: {
     Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json",
